@@ -1,6 +1,6 @@
 <template>
   <div class="about">
-    <h1>Project buat latihan, <a href="https://www.freecodecamp.org/news/how-to-update-node-and-npm-to-the-latest-version/">referensi</a></h1>
+    <h1>Project buat latihan, <a href="https://medium.com/@ibnusyawall/membuat-aplikasi-todo-list-dengan-vue-3-pwa-a20c1e29c326">referensi</a></h1>
   </div>
 </template>
 
