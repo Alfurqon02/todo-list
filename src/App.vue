@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 
 // --- Navbar scroll state ---
 const scrolled = ref(false)
@@ -9,6 +9,46 @@ const activeSection = ref('hero')
 // --- Accordion state (mobile) ---
 const expandedExp = ref(null)
 const expandedOrg = ref(null)
+
+// --- Typing animation state ---
+const greetingFull = '// Hello, World! I\'m'
+const greetingTyped = ref('')
+let typingTimeout = null
+
+function startTypingLoop() {
+  let i = 0
+  let isDeleting = false
+  const typeSpeed = 160
+  const deleteSpeed = 80
+  const pauseAfterType = 2000
+  const pauseAfterDelete = 800
+
+  function tick() {
+    if (!isDeleting) {
+      // Typing
+      greetingTyped.value = greetingFull.slice(0, i + 1)
+      i++
+      if (i >= greetingFull.length) {
+        isDeleting = true
+        typingTimeout = setTimeout(tick, pauseAfterType)
+      } else {
+        typingTimeout = setTimeout(tick, typeSpeed)
+      }
+    } else {
+      // Deleting
+      i--
+      greetingTyped.value = greetingFull.slice(0, i)
+      if (i <= 0) {
+        isDeleting = false
+        typingTimeout = setTimeout(tick, pauseAfterDelete)
+      } else {
+        typingTimeout = setTimeout(tick, deleteSpeed)
+      }
+    }
+  }
+
+  tick()
+}
 
 function toggleExp(index) {
   expandedExp.value = expandedExp.value === index ? null : index
@@ -50,11 +90,15 @@ onMounted(() => {
   )
 
   document.querySelectorAll('.fade-in').forEach((el) => observer.observe(el))
+
+  // Start typing loop
+  startTypingLoop()
 })
 
 onUnmounted(() => {
   window.removeEventListener('scroll', onScroll)
   if (observer) observer.disconnect()
+  if (typingTimeout) clearTimeout(typingTimeout)
 })
 
 function scrollTo(id) {
@@ -222,7 +266,7 @@ const organizations = [
     <div class="container">
       <div class="hero-content">
         <div class="hero-text">
-          <p class="hero-greeting fade-in">// Hello, World! I'm</p>
+          <p class="hero-greeting fade-in">{{ greetingTyped }}<span class="typing-cursor">|</span></p>
           <h1 class="hero-name fade-in fade-in-delay-1">
             Mohammad<br><span class="gradient-text">Al Furqon</span>
           </h1>
@@ -467,5 +511,19 @@ const organizations = [
 </template>
 
 <style scoped>
-/* Scoped overrides if needed */
+/* Typing cursor animation */
+.typing-cursor {
+  display: inline-block;
+  font-weight: 300;
+  color: #64ffda;
+  animation: blink-cursor 0.75s step-end infinite;
+  margin-left: 1px;
+}
+
+
+
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
 </style>
