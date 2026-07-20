@@ -198,7 +198,7 @@ const organizations = [
     details: [
       'Completed specialized ML training using Python and JavaScript environments.',
       'Built deep architectures using TensorFlow and TensorFlow.js frameworks.',
-      'Developed "NutriChive" — an intelligent app using computer vision to identify ingredients and output recipes.'
+      'Developed "NutriChive" an intelligent app using computer vision to identify ingredients and output recipes.'
     ]
   },
   {
@@ -404,7 +404,7 @@ const organizations = [
           <div>
             <div class="achievement-title">Book Co-Author</div>
             <div class="achievement-desc">
-              "Strategi Membangun Portal Website Aman Dari Serangan Judi Online" — Published in partnership with the Intelligent System and Humanized Computing Research Group (ISHC-RG), Faculty of Informatics and Data Science, Universitas Sebelas Maret.
+              "Strategi Membangun Portal Website Aman Dari Serangan Judi Online" Published in partnership with the Intelligent System and Humanized Computing Research Group (ISHC-RG), Faculty of Informatics and Data Science, Universitas Sebelas Maret.
             </div>
           </div>
         </div>
@@ -414,7 +414,7 @@ const organizations = [
           <div>
             <div class="achievement-title">Undergraduate Thesis</div>
             <div class="achievement-desc">
-              "Dual-View Radiographic Captioning for Chest X-ray Frontal and Lateral using DenseNet-LSTM" — Undergraduate Publication Forthcoming / In Progress.
+              "Dual-View Radiographic Captioning for Chest X-ray Frontal and Lateral using DenseNet-LSTM" - Undergraduate Publication Forthcoming / In Progress.
             </div>
           </div>
         </div>
