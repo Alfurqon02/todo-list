@@ -420,7 +420,7 @@ const organizations = [
         <div class="lang-chip">
           <span class="lang-flag">ID</span>
           <div>
-            <div class="lang-name">Bahasa Indonesia</div>
+            <div class="lang-name">Indonesian</div>
             <div class="lang-level">Native</div>
           </div>
         </div>
