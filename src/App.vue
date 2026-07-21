@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 
 // --- Navbar scroll state ---
 const scrolled = ref(false)
@@ -9,6 +9,237 @@ const activeSection = ref('hero')
 // --- Accordion state (mobile) ---
 const expandedExp = ref(null)
 const expandedOrg = ref(null)
+
+// --- Custom cursor state (desktop) ---
+const cursorX = ref(0)
+const cursorY = ref(0)
+const cursorRingX = ref(0)
+const cursorRingY = ref(0)
+const cursorVisible = ref(false)
+const cursorEnlarged = ref(false)
+let cursorRaf = null
+
+// --- Computer eye tracking ---
+const computerRef = ref(null)
+const eyeOffsetX = ref(0)
+const eyeOffsetY = ref(0)
+const MAX_EYE_MOVE = 6
+
+// --- Blink state ---
+const eyelidY = ref(-54) // fully open (lid above eye)
+let blinkTimeout = null
+let blinkRaf = null
+let blinkTarget = -54 // target Y position
+const EYELID_OPEN = -54
+const EYELID_CLOSED = 0
+const BLINK_SPEED_DOWN = 0.35 // closing speed (fast)
+const BLINK_SPEED_UP = 0.18   // opening speed (slower, natural)
+
+function animateEyelid() {
+  const diff = blinkTarget - eyelidY.value
+  const speed = blinkTarget === EYELID_CLOSED ? BLINK_SPEED_DOWN : BLINK_SPEED_UP
+  eyelidY.value += diff * speed
+
+  if (Math.abs(diff) > 0.3) {
+    blinkRaf = requestAnimationFrame(animateEyelid)
+  } else {
+    eyelidY.value = blinkTarget
+  }
+}
+
+function doBlink() {
+  // Close eyes
+  blinkTarget = EYELID_CLOSED
+  if (blinkRaf) cancelAnimationFrame(blinkRaf)
+  animateEyelid()
+
+  // Open after a brief hold
+  const holdTime = 60 + Math.random() * 40
+  return new Promise(resolve => {
+    setTimeout(() => {
+      blinkTarget = EYELID_OPEN
+      if (blinkRaf) cancelAnimationFrame(blinkRaf)
+      animateEyelid()
+      setTimeout(resolve, 120)
+    }, holdTime)
+  })
+}
+
+function startBlinkLoop() {
+  async function scheduleBlink() {
+    const delay = 2500 + Math.random() * 4000 // 2.5-6.5 seconds
+    blinkTimeout = setTimeout(async () => {
+      // Single blink
+      await doBlink()
+
+      // ~35% chance of double blink
+      if (Math.random() < 0.35) {
+        await new Promise(r => setTimeout(r, 150 + Math.random() * 100))
+        await doBlink()
+      }
+
+      scheduleBlink()
+    }, delay)
+  }
+  scheduleBlink()
+}
+
+// --- Idle detection (eyes return to center) ---
+let idleTimer = null
+let idleRaf = null
+const IDLE_DELAY = 2000 // ms before eyes drift to center
+
+function startIdleDrift() {
+  function drift() {
+    eyeOffsetX.value += (0 - eyeOffsetX.value) * 0.05
+    eyeOffsetY.value += (0 - eyeOffsetY.value) * 0.05
+    if (Math.abs(eyeOffsetX.value) > 0.05 || Math.abs(eyeOffsetY.value) > 0.05) {
+      idleRaf = requestAnimationFrame(drift)
+    } else {
+      eyeOffsetX.value = 0
+      eyeOffsetY.value = 0
+    }
+  }
+  drift()
+}
+
+function resetIdleTimer() {
+  if (idleTimer) clearTimeout(idleTimer)
+  if (idleRaf) cancelAnimationFrame(idleRaf)
+  idleTimer = setTimeout(() => {
+    startIdleDrift()
+  }, IDLE_DELAY)
+}
+
+function updateEyeTracking() {
+  if (!computerRef.value) return
+  const rect = computerRef.value.getBoundingClientRect()
+  const centerX = rect.left + rect.width / 2
+  const centerY = rect.top + rect.height * 0.35 // eyes are in upper portion
+  const dx = cursorX.value - centerX
+  const dy = cursorY.value - centerY
+  const dist = Math.sqrt(dx * dx + dy * dy) || 1
+  const clamp = Math.min(MAX_EYE_MOVE, dist / 15)
+  eyeOffsetX.value = (dx / dist) * clamp
+  eyeOffsetY.value = (dy / dist) * clamp
+}
+
+// --- Water drop ripple effect ---
+const rippleCanvas = ref(null)
+let rippleCtx = null
+let ripples = []
+let rippleRaf = null
+let lastRippleTime = 0
+const RIPPLE_THROTTLE = 60 // ms between spawns
+const MAX_RIPPLES = 40
+
+const rippleColors = [
+  { r: 99, g: 102, b: 241 },   // indigo (accent-primary)
+  { r: 6, g: 182, b: 212 },    // cyan (accent-secondary)
+  { r: 168, g: 85, b: 247 },   // purple (accent-tertiary)
+  { r: 129, g: 140, b: 248 },  // light indigo
+  { r: 96, g: 165, b: 250 },   // sky blue
+]
+
+function spawnRipple(x, y) {
+  const color = rippleColors[Math.floor(Math.random() * rippleColors.length)]
+  ripples.push({
+    x, y,
+    radius: 2 + Math.random() * 3,
+    maxRadius: 30 + Math.random() * 50,
+    opacity: 0.35 + Math.random() * 0.2,
+    speed: 0.8 + Math.random() * 0.6,
+    color,
+    lineWidth: 1.2 + Math.random() * 0.8,
+  })
+  // Keep array bounded
+  if (ripples.length > MAX_RIPPLES) {
+    ripples.splice(0, ripples.length - MAX_RIPPLES)
+  }
+}
+
+function animateRipples() {
+  if (!rippleCtx || !rippleCanvas.value) {
+    rippleRaf = requestAnimationFrame(animateRipples)
+    return
+  }
+
+  const canvas = rippleCanvas.value
+  rippleCtx.clearRect(0, 0, canvas.width, canvas.height)
+
+  for (let i = ripples.length - 1; i >= 0; i--) {
+    const r = ripples[i]
+    r.radius += r.speed
+    const progress = r.radius / r.maxRadius
+    r.opacity = Math.max(0, (1 - progress) * 0.4)
+
+    if (r.opacity <= 0.005 || r.radius >= r.maxRadius) {
+      ripples.splice(i, 1)
+      continue
+    }
+
+    // Draw outer ring
+    rippleCtx.beginPath()
+    rippleCtx.arc(r.x, r.y, r.radius, 0, Math.PI * 2)
+    rippleCtx.strokeStyle = `rgba(${r.color.r}, ${r.color.g}, ${r.color.b}, ${r.opacity})`
+    rippleCtx.lineWidth = r.lineWidth * (1 - progress * 0.5)
+    rippleCtx.stroke()
+
+    // Draw subtle inner fill (water sheen)
+    rippleCtx.beginPath()
+    rippleCtx.arc(r.x, r.y, r.radius * 0.6, 0, Math.PI * 2)
+    rippleCtx.fillStyle = `rgba(${r.color.r}, ${r.color.g}, ${r.color.b}, ${r.opacity * 0.15})`
+    rippleCtx.fill()
+  }
+
+  rippleRaf = requestAnimationFrame(animateRipples)
+}
+
+function resizeRippleCanvas() {
+  if (!rippleCanvas.value) return
+  rippleCanvas.value.width = window.innerWidth
+  rippleCanvas.value.height = window.innerHeight
+}
+
+function onMouseMove(e) {
+  cursorX.value = e.clientX
+  cursorY.value = e.clientY
+  if (!cursorVisible.value) cursorVisible.value = true
+
+  // Update eye tracking
+  updateEyeTracking()
+  resetIdleTimer()
+
+  // Spawn water drop ripple (throttled)
+  const now = Date.now()
+  if (now - lastRippleTime > RIPPLE_THROTTLE) {
+    spawnRipple(e.clientX, e.clientY)
+    lastRippleTime = now
+  }
+}
+
+function onMouseLeave() {
+  cursorVisible.value = false
+}
+
+function onMouseEnter() {
+  cursorVisible.value = true
+}
+
+function animateCursorRing() {
+  // Smooth trailing effect using lerp
+  cursorRingX.value += (cursorX.value - cursorRingX.value) * 0.15
+  cursorRingY.value += (cursorY.value - cursorRingY.value) * 0.15
+  cursorRaf = requestAnimationFrame(animateCursorRing)
+}
+
+function setupCursorHoverListeners() {
+  const interactiveEls = document.querySelectorAll('a, button, .btn, .skill-chip, .glass-card, .lang-chip, .footer-link, .nav-brand, .nav-toggle')
+  interactiveEls.forEach(el => {
+    el.addEventListener('mouseenter', () => { cursorEnlarged.value = true })
+    el.addEventListener('mouseleave', () => { cursorEnlarged.value = false })
+  })
+}
 
 // --- Typing animation state ---
 const greetingFull = '// Hello, World! I\'m'
@@ -93,12 +324,42 @@ onMounted(() => {
 
   // Start typing loop
   startTypingLoop()
+
+  // Start eye blink loop
+  startBlinkLoop()
+
+  // Custom cursor + water ripples (desktop only)
+  if (window.matchMedia('(pointer: fine)').matches) {
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseleave', onMouseLeave)
+    document.addEventListener('mouseenter', onMouseEnter)
+    animateCursorRing()
+    nextTick(() => setupCursorHoverListeners())
+
+    // Setup ripple canvas
+    if (rippleCanvas.value) {
+      rippleCtx = rippleCanvas.value.getContext('2d')
+      resizeRippleCanvas()
+      window.addEventListener('resize', resizeRippleCanvas)
+      animateRipples()
+    }
+  }
 })
 
 onUnmounted(() => {
   window.removeEventListener('scroll', onScroll)
   if (observer) observer.disconnect()
   if (typingTimeout) clearTimeout(typingTimeout)
+  document.removeEventListener('mousemove', onMouseMove)
+  document.removeEventListener('mouseleave', onMouseLeave)
+  document.removeEventListener('mouseenter', onMouseEnter)
+  window.removeEventListener('resize', resizeRippleCanvas)
+  if (cursorRaf) cancelAnimationFrame(cursorRaf)
+  if (rippleRaf) cancelAnimationFrame(rippleRaf)
+  if (blinkTimeout) clearTimeout(blinkTimeout)
+  if (blinkRaf) cancelAnimationFrame(blinkRaf)
+  if (idleTimer) clearTimeout(idleTimer)
+  if (idleRaf) cancelAnimationFrame(idleRaf)
 })
 
 function scrollTo(id) {
@@ -232,6 +493,21 @@ const organizations = [
 </script>
 
 <template>
+  <!-- Custom Cursor -->
+  <div
+    class="cursor-dot"
+    :class="{ visible: cursorVisible, enlarged: cursorEnlarged }"
+    :style="{ transform: `translate(${cursorX}px, ${cursorY}px)` }"
+  ></div>
+  <div
+    class="cursor-ring"
+    :class="{ visible: cursorVisible, enlarged: cursorEnlarged }"
+    :style="{ transform: `translate(${cursorRingX}px, ${cursorRingY}px)` }"
+  ></div>
+
+  <!-- Water Drop Ripple Canvas -->
+  <canvas ref="rippleCanvas" class="ripple-canvas"></canvas>
+
   <!-- Background effects -->
   <div class="bg-grid"></div>
   <div class="bg-glow bg-glow--1"></div>
@@ -301,8 +577,138 @@ const organizations = [
           </div>
         </div>
         <div class="hero-visual fade-in">
-          <div class="avatar-wrapper">
-            <img src="/avatar.png" alt="Mohammad Al Furqon" class="avatar-img" />
+          <div class="computer-wrapper" ref="computerRef">
+            <!-- SVG Computer with Eyes -->
+            <svg viewBox="0 0 280 260" xmlns="http://www.w3.org/2000/svg" class="computer-svg">
+              <!-- Monitor body -->
+              <defs>
+                <linearGradient id="monitorGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#1e1e3a"/>
+                  <stop offset="100%" stop-color="#0f0f23"/>
+                </linearGradient>
+                <linearGradient id="screenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#12122a"/>
+                  <stop offset="100%" stop-color="#0a0a1a"/>
+                </linearGradient>
+                <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#6366f1"/>
+                  <stop offset="100%" stop-color="#06b6d4"/>
+                </linearGradient>
+                <filter id="eyeGlow">
+                  <feGaussianBlur stdDeviation="2" result="blur"/>
+                  <feMerge>
+                    <feMergeNode in="blur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+                <filter id="screenGlow">
+                  <feGaussianBlur stdDeviation="4" result="blur"/>
+                  <feMerge>
+                    <feMergeNode in="blur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+
+                <!-- Clip paths for eyelids -->
+                <clipPath id="leftEyeClip">
+                  <ellipse cx="105" cy="95" rx="29" ry="27"/>
+                </clipPath>
+                <clipPath id="rightEyeClip">
+                  <ellipse cx="175" cy="95" rx="29" ry="27"/>
+                </clipPath>
+              </defs>
+
+              <!-- Monitor outer shell -->
+              <rect x="20" y="10" width="240" height="160" rx="12" fill="url(#monitorGrad)" stroke="rgba(99,102,241,0.3)" stroke-width="1.5"/>
+
+              <!-- Screen bezel -->
+              <rect x="32" y="22" width="216" height="136" rx="6" fill="url(#screenGrad)" stroke="rgba(99,102,241,0.15)" stroke-width="1"/>
+
+              <!-- Screen shine line -->
+              <line x1="40" y1="28" x2="100" y2="28" stroke="rgba(99,102,241,0.15)" stroke-width="0.5" stroke-linecap="round"/>
+
+              <!-- Code lines on screen (decorative) -->
+              <rect x="44" y="40" width="60" height="3" rx="1.5" fill="rgba(99,102,241,0.2)"/>
+              <rect x="44" y="48" width="90" height="3" rx="1.5" fill="rgba(6,182,212,0.15)"/>
+              <rect x="44" y="56" width="45" height="3" rx="1.5" fill="rgba(168,85,247,0.15)"/>
+              <rect x="44" y="130" width="70" height="3" rx="1.5" fill="rgba(99,102,241,0.15)"/>
+              <rect x="44" y="138" width="40" height="3" rx="1.5" fill="rgba(6,182,212,0.1)"/>
+              <rect x="170" y="40" width="50" height="3" rx="1.5" fill="rgba(168,85,247,0.12)"/>
+              <rect x="170" y="48" width="65" height="3" rx="1.5" fill="rgba(99,102,241,0.12)"/>
+              <rect x="170" y="130" width="55" height="3" rx="1.5" fill="rgba(99,102,241,0.12)"/>
+
+              <!-- LEFT EYE -->
+              <g class="eye-group">
+                <ellipse cx="105" cy="95" rx="28" ry="26" fill="#fff" stroke="rgba(99,102,241,0.3)" stroke-width="1" filter="url(#eyeGlow)"/>
+                <!-- Left iris -->
+                <circle :cx="105 + eyeOffsetX" :cy="95 + eyeOffsetY" r="12" fill="url(#accentGrad)"/>
+                <!-- Left pupil -->
+                <circle :cx="105 + eyeOffsetX * 1.2" :cy="95 + eyeOffsetY * 1.2" r="5.5" fill="#0a0a1a"/>
+                <!-- Left pupil highlight -->
+                <circle :cx="102 + eyeOffsetX * 0.8" :cy="91 + eyeOffsetY * 0.8" r="2.5" fill="rgba(255,255,255,0.85)"/>
+                <!-- Left eyelid (slides from top) -->
+                <g clip-path="url(#leftEyeClip)">
+                  <rect x="76" :y="68 + eyelidY" width="58" height="54" fill="#12122a" rx="2"/>
+                  <!-- Eyelid edge highlight -->
+                  <line x1="77" :y1="122 + eyelidY" x2="133" :y2="122 + eyelidY" stroke="rgba(99,102,241,0.3)" stroke-width="1.5" stroke-linecap="round"/>
+                </g>
+              </g>
+              <!-- Left eyelid line -->
+              <path d="M77 85 Q105 70 133 85" fill="none" stroke="rgba(99,102,241,0.25)" stroke-width="1.5"/>
+
+              <!-- RIGHT EYE -->
+              <g class="eye-group">
+                <ellipse cx="175" cy="95" rx="28" ry="26" fill="#fff" stroke="rgba(99,102,241,0.3)" stroke-width="1" filter="url(#eyeGlow)"/>
+                <!-- Right iris -->
+                <circle :cx="175 + eyeOffsetX" :cy="95 + eyeOffsetY" r="12" fill="url(#accentGrad)"/>
+                <!-- Right pupil -->
+                <circle :cx="175 + eyeOffsetX * 1.2" :cy="95 + eyeOffsetY * 1.2" r="5.5" fill="#0a0a1a"/>
+                <!-- Right pupil highlight -->
+                <circle :cx="172 + eyeOffsetX * 0.8" :cy="91 + eyeOffsetY * 0.8" r="2.5" fill="rgba(255,255,255,0.85)"/>
+                <!-- Right eyelid (slides from top) -->
+                <g clip-path="url(#rightEyeClip)">
+                  <rect x="146" :y="68 + eyelidY" width="58" height="54" fill="#12122a" rx="2"/>
+                  <!-- Eyelid edge highlight -->
+                  <line x1="147" :y1="122 + eyelidY" x2="203" :y2="122 + eyelidY" stroke="rgba(99,102,241,0.3)" stroke-width="1.5" stroke-linecap="round"/>
+                </g>
+              </g>
+              <!-- Right eyelid line -->
+              <path d="M147 85 Q175 70 203 85" fill="none" stroke="rgba(99,102,241,0.25)" stroke-width="1.5"/>
+
+              <!-- Power indicator LED -->
+              <circle cx="140" cy="164" r="2.5" fill="#10b981" filter="url(#screenGlow)"/>
+
+              <!-- Monitor stand neck -->
+              <rect x="120" y="170" width="40" height="20" rx="2" fill="url(#monitorGrad)" stroke="rgba(99,102,241,0.2)" stroke-width="1"/>
+
+              <!-- Monitor stand base -->
+              <ellipse cx="140" cy="195" rx="50" ry="8" fill="url(#monitorGrad)" stroke="rgba(99,102,241,0.2)" stroke-width="1"/>
+
+              <!-- Keyboard -->
+              <rect x="50" y="215" width="180" height="35" rx="6" fill="url(#monitorGrad)" stroke="rgba(99,102,241,0.2)" stroke-width="1"/>
+              <!-- Keyboard keys row 1 -->
+              <rect x="60" y="220" width="12" height="8" rx="2" fill="rgba(99,102,241,0.15)"/>
+              <rect x="76" y="220" width="12" height="8" rx="2" fill="rgba(99,102,241,0.12)"/>
+              <rect x="92" y="220" width="12" height="8" rx="2" fill="rgba(6,182,212,0.15)"/>
+              <rect x="108" y="220" width="12" height="8" rx="2" fill="rgba(99,102,241,0.12)"/>
+              <rect x="124" y="220" width="12" height="8" rx="2" fill="rgba(99,102,241,0.15)"/>
+              <rect x="140" y="220" width="12" height="8" rx="2" fill="rgba(168,85,247,0.12)"/>
+              <rect x="156" y="220" width="12" height="8" rx="2" fill="rgba(99,102,241,0.12)"/>
+              <rect x="172" y="220" width="12" height="8" rx="2" fill="rgba(6,182,212,0.12)"/>
+              <rect x="188" y="220" width="12" height="8" rx="2" fill="rgba(99,102,241,0.15)"/>
+              <rect x="204" y="220" width="12" height="8" rx="2" fill="rgba(99,102,241,0.12)"/>
+              <!-- Keyboard keys row 2 -->
+              <rect x="64" y="232" width="12" height="8" rx="2" fill="rgba(99,102,241,0.1)"/>
+              <rect x="80" y="232" width="12" height="8" rx="2" fill="rgba(99,102,241,0.12)"/>
+              <rect x="96" y="232" width="12" height="8" rx="2" fill="rgba(99,102,241,0.1)"/>
+              <rect x="112" y="232" width="40" height="8" rx="2" fill="rgba(99,102,241,0.08)"/>
+              <rect x="156" y="232" width="12" height="8" rx="2" fill="rgba(99,102,241,0.12)"/>
+              <rect x="172" y="232" width="12" height="8" rx="2" fill="rgba(99,102,241,0.1)"/>
+              <rect x="188" y="232" width="12" height="8" rx="2" fill="rgba(99,102,241,0.12)"/>
+              <rect x="204" y="232" width="12" height="8" rx="2" fill="rgba(99,102,241,0.1)"/>
+            </svg>
+
+            <!-- Floating badges -->
             <span class="floating-badge floating-badge--1">Vue.js</span>
             <span class="floating-badge floating-badge--2">Laravel</span>
             <span class="floating-badge floating-badge--3">TensorFlow</span>
@@ -494,8 +900,8 @@ const organizations = [
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
           mohammadalfurgon62@gmail.com
         </a>
-        <a href="tel:085383576966" class="footer-link">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        <a href="https://wa.me/6285383576966" target="_blank" class="footer-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
           085383576966
         </a>
         <a href="https://github.com/alfurqon02" target="_blank" class="footer-link">
@@ -520,10 +926,86 @@ const organizations = [
   margin-left: 1px;
 }
 
-
-
 @keyframes blink-cursor {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
+}
+
+/* --- Custom Cursor (desktop only) --- */
+.cursor-dot,
+.cursor-ring {
+  position: fixed;
+  top: 0;
+  left: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 99999;
+  opacity: 0;
+  transition: opacity 0.3s ease, width 0.3s ease, height 0.3s ease, background 0.3s ease;
+  will-change: transform;
+}
+
+.cursor-dot {
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  margin-top: -4px;
+  background: var(--accent-primary);
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.6), 0 0 24px rgba(99, 102, 241, 0.3);
+}
+
+.cursor-ring {
+  width: 36px;
+  height: 36px;
+  margin-left: -18px;
+  margin-top: -18px;
+  border: 1.5px solid rgba(99, 102, 241, 0.5);
+  background: transparent;
+}
+
+.cursor-dot.visible,
+.cursor-ring.visible {
+  opacity: 1;
+}
+
+/* Enlarge on interactive elements */
+.cursor-dot.enlarged {
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  margin-top: -6px;
+  background: var(--accent-secondary);
+  box-shadow: 0 0 16px rgba(6, 182, 212, 0.6), 0 0 32px rgba(6, 182, 212, 0.3);
+}
+
+.cursor-ring.enlarged {
+  width: 52px;
+  height: 52px;
+  margin-left: -26px;
+  margin-top: -26px;
+  border-color: rgba(6, 182, 212, 0.4);
+  background: rgba(6, 182, 212, 0.05);
+}
+
+/* --- Water Drop Ripple Canvas --- */
+.ripple-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Hide custom cursor & ripples on touch/mobile devices */
+@media (pointer: coarse) {
+  .cursor-dot,
+  .cursor-ring {
+    display: none !important;
+  }
+  .ripple-canvas {
+    display: none !important;
+  }
 }
 </style>
