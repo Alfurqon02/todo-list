@@ -43,11 +43,12 @@ function scrollTo(href: string) {
       <!-- Logo -->
       <a
         href="#hero"
-        class="text-xl font-bold tracking-tight transition-colors"
+        class="flex items-center gap-2.5 text-xl font-bold tracking-tight transition-transform hover:scale-105"
         style="color: var(--accent-cyan)"
         @click.prevent="scrollTo('#hero')"
       >
-        &lt;Furqon /&gt;
+        <!-- <img src="/logo.svg" alt="Furqon Ice Monogram Logo" class="w-8 h-8" /> -->
+        <span>&lt;Furqon /&gt;</span>
       </a>
 
       <!-- Desktop Nav Links -->
