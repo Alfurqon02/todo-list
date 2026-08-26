@@ -62,10 +62,10 @@ export const personalInfo: PersonalInfo = {
   tagline: 'Building robust digital experiences with precision and creativity.',
   website: 'lucialf.my.id',
   linkedin: 'linkedin.com/in/lucialf',
-  email: 'mohammadalfurgon62@gmail.com',
+  email: 'mohammadalfurqon62@gmail.com',
   about: `A passionate Fullstack Developer and Software Engineer with extensive experience spanning Japanese industry, 
 government agencies, academic institutions, and international cybersecurity operations. 
-Graduated from Universitas Sebelas Maret with a strong GPA of 3.77/4.00 in Informatics. 
+Graduated from Universitas Sebelas Maret in Program Study of Informatics with strong fundamentals in Machine Learning and Software Engineering. 
 Skilled in building secure, scalable web applications and contributing to cutting-edge research 
 in Machine Learning and Humanized Computing.`,
 }
