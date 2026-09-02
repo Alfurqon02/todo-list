@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { personalInfo, education, languages } from '@/data/portfolioData'
-import { useJourneyStage } from '@/composables/useJourney'
+import { useJourneyShards, useJourneyStage } from '@/composables/useJourney'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import {
@@ -23,7 +23,10 @@ let scrollTriggerInstance: ScrollTrigger | null = null
 
 // Copy is choreographed off the shared journey position, so it arrives and
 // departs in lockstep with the camera rather than on its own local curve.
-const { opacity: contentOpacity, transform: contentTransform } = useJourneyStage(1)
+const { opacity: contentOpacity, transform: contentTransform, filter: contentFilter } = useJourneyStage(1)
+
+const copyRef = ref<HTMLElement | null>(null)
+useJourneyShards(1, copyRef)
 
 onMounted(async () => {
   await nextTick()
@@ -76,14 +79,15 @@ const competencies = [
     class="relative w-full h-screen flex items-center justify-center bg-transparent overflow-hidden px-4 sm:px-8 md:px-16 select-none"
   >
     <div
-      class="max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-center transition-all duration-100 ease-out"
+      class="max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-center"
       :style="{
         opacity: contentOpacity.toFixed(2),
         transform: contentTransform,
+        filter: contentFilter,
       }"
     >
       <!-- Left Column: Operator Dossier Specifications (7 cols) -->
-      <div class="lg:col-span-7 space-y-6">
+      <div ref="copyRef" class="lg:col-span-7 space-y-6">
         <!-- Section Tag & Headline -->
         <div>
           <div class="flex items-center gap-2 font-mono text-xs text-neon-blue mb-1">
@@ -155,7 +159,7 @@ const competencies = [
       </div>
 
       <!-- Right Column: Unobstructed 3D Biometric Scanner Core HUD Frame (5 cols) -->
-      <div class="lg:col-span-5 relative flex items-center justify-center pointer-events-none">
+      <div class="hidden lg:col-span-5 relative lg:flex items-center justify-center pointer-events-none">
         <div class="artifact-frame w-full max-w-[420px] aspect-square relative flex items-center justify-center">
           <!-- Outer Scanning Ring -->
           <div class="absolute inset-0 rounded-full border border-cyan-500/25 animate-spin" style="animation-duration: 25s;" />

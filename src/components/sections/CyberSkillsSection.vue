@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { skills } from '@/data/portfolioData'
 import { useCyberAudio } from '@/composables/useCyberAudio'
 import { useExperienceStore } from '@/stores/experienceStore'
-import { contentProgress, useJourneyStage } from '@/composables/useJourney'
+import { contentProgress, useJourneyShards, useJourneyStage } from '@/composables/useJourney'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import {
@@ -40,7 +40,10 @@ const activeCategory = computed(() => skills[activeCategoryIndex.value] || skill
 
 // Copy is choreographed off the shared journey position, so the stage arrives
 // and departs in lockstep with the camera rather than on its own local curve.
-const { opacity: stageOpacity, scale: stageScale } = useJourneyStage(3)
+const { opacity: stageOpacity, scale: stageScale, filter: stageFilter } = useJourneyStage(3)
+
+const copyRef = ref<HTMLElement | null>(null)
+useJourneyShards(3, copyRef)
 
 onMounted(async () => {
   await nextTick()
@@ -53,10 +56,13 @@ onMounted(async () => {
       pin: true,
       anticipatePin: 1,
       scrub: 1.2,
-      onUpdate: (self) => {
-        // Same fix as the experience carousel: only the first four of six
-        // categories used to land before the section faded out.
-        const visible = contentProgress(3, self.progress)
+    })
+
+    // Journey-driven, for the same reason as the experience carousel.
+    watch(
+      () => store.journeyProgress,
+      (p) => {
+        const visible = contentProgress(3, p)
         const calculatedIndex = Math.min(
           skills.length - 1,
           Math.floor(visible * skills.length)
@@ -67,7 +73,8 @@ onMounted(async () => {
           audio.playTick()
         }
       },
-    })
+      { immediate: true }
+    )
   }
 })
 
@@ -97,7 +104,7 @@ function selectCategory(idx: number) {
   <div ref="sectionRef" id="skills" class="relative w-full h-screen overflow-hidden bg-transparent flex flex-col justify-between select-none px-4 sm:px-8 md:px-16 border-t border-cyan-500/15">
     <!-- Top Telemetry Header -->
     <div
-      class="relative z-20 pt-20 max-w-6xl mx-auto w-full flex items-center justify-between pointer-events-none transition-opacity duration-150"
+      class="relative z-20 pt-20 max-w-6xl mx-auto w-full flex items-center justify-between pointer-events-none"
       :style="{ opacity: stageOpacity.toFixed(2) }"
     >
       <div>
@@ -118,14 +125,15 @@ function selectCategory(idx: number) {
 
     <!-- Center Stage: Frame for Master 3D Sphere on Left + Active Architecture Card on Right -->
     <div
-      class="relative z-10 max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center transition-transform duration-100 ease-out"
+      class="relative z-10 max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center"
       :style="{
         transform: `scale(${stageScale.toFixed(3)})`,
         opacity: stageOpacity.toFixed(2),
+        filter: stageFilter,
       }"
     >
       <!-- Left: Frame area for Master 3D Holographic Sphere Canvas (5 cols) -->
-      <div class="lg:col-span-5 flex items-center justify-center relative pointer-events-none">
+      <div class="hidden lg:col-span-5 lg:flex items-center justify-center relative pointer-events-none">
         <div class="artifact-frame w-full max-w-[360px] aspect-square relative flex items-center justify-center">
           <div class="w-64 h-64 rounded-full border border-cyan-500/20 animate-spin" style="animation-duration: 30s;" />
           <div class="w-72 h-72 rounded-full border border-dashed border-cyan-500/15 animate-spin" style="animation-duration: 20s; animation-direction: reverse;" />
@@ -138,7 +146,7 @@ function selectCategory(idx: number) {
       </div>
 
       <!-- Right: Active Stack Node Display (7 cols) -->
-      <div class="lg:col-span-7 space-y-5">
+      <div ref="copyRef" class="lg:col-span-7 space-y-5">
         <!-- Interactive Category Switcher Chips -->
         <div class="flex flex-wrap gap-2">
           <button
@@ -200,7 +208,7 @@ function selectCategory(idx: number) {
 
     <!-- Bottom Scroll Cue -->
     <div
-      class="relative z-20 pb-8 px-6 flex flex-col items-center gap-2 pointer-events-none transition-opacity duration-150"
+      class="relative z-20 pb-8 px-6 flex flex-col items-center gap-2 pointer-events-none"
       :style="{ opacity: stageOpacity.toFixed(2) }"
     >
       <div class="flex items-center gap-2 text-xs font-mono text-slate-400 bg-abyss/85 px-4 py-1 border border-cyan-500/20 rounded-full backdrop-blur-sm">

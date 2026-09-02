@@ -2,7 +2,7 @@
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { personalInfo, education, experiences } from '@/data/portfolioData'
 import { useCyberAudio } from '@/composables/useCyberAudio'
-import { useJourneyStage } from '@/composables/useJourney'
+import { useJourneyShards, useJourneyStage } from '@/composables/useJourney'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import {
@@ -19,7 +19,10 @@ let scrollTriggerInstance: ScrollTrigger | null = null
 
 // Copy rides the same flight the camera is on: it holds while the camera is
 // parked, then rushes past the lens as the camera launches down the corridor.
-const { opacity: stageOpacity, transform: stageTransform } = useJourneyStage(0)
+const { opacity: stageOpacity, transform: stageTransform, filter: stageFilter } = useJourneyStage(0)
+
+const copyRef = ref<HTMLElement | null>(null)
+useJourneyShards(0, copyRef)
 
 onMounted(async () => {
   await nextTick()
@@ -56,25 +59,26 @@ function scrollTo(selector: string) {
   <section
     ref="heroRef"
     id="hero"
-    class="relative min-h-screen flex items-center justify-center pt-24 pb-16 px-4 sm:px-8 md:px-16 overflow-hidden bg-transparent"
+    class="relative min-h-screen flex items-center justify-center pt-20 pb-10 sm:pt-24 sm:pb-16 px-4 sm:px-8 md:px-16 overflow-hidden bg-transparent"
   >
     <!-- Background Ambient Glow -->
     <div class="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[450px] bg-neon-blue/10 blur-[140px] pointer-events-none rounded-full" />
 
-    <div class="relative z-10 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+    <div class="relative z-10 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
       <!-- Left Column: Typography & Action (7 cols) -->
       <div
-        class="lg:col-span-7 transition-all duration-100 ease-out"
-        :style="{ opacity: stageOpacity.toFixed(2), transform: stageTransform }"
+        ref="copyRef"
+        class="lg:col-span-7"
+        :style="{ opacity: stageOpacity.toFixed(2), transform: stageTransform, filter: stageFilter }"
       >
         <!-- Telemetry Status Tag -->
-        <div class="inline-flex items-center gap-2 px-3 py-1 bg-cyan-950/60 border border-cyan-500/30 rounded-full font-mono text-xs text-neon-blue mb-6">
+        <div class="inline-flex items-center gap-2 px-3 py-1 bg-cyan-950/60 border border-cyan-500/30 rounded-full font-mono text-xs text-neon-blue mb-4 sm:mb-6">
           <span class="w-2 h-2 rounded-full bg-neon-blue animate-ping" />
           <span>CYBERNETICS // MOHAMMAD AL FURQON</span>
         </div>
 
         <!-- Main Headline -->
-        <h1 class="text-4xl sm:text-6xl md:text-7xl font-black font-rajdhani text-white uppercase tracking-tight leading-[0.92] mb-6">
+        <h1 class="text-4xl sm:text-6xl md:text-7xl font-black font-rajdhani text-white uppercase tracking-tight leading-[0.92] mb-4 sm:mb-6">
           <span class="text-slate-400 block text-2xl sm:text-3xl font-light mb-1">
             SOFTWARE ENGINEER &amp;
           </span>
@@ -87,14 +91,14 @@ function scrollTo(selector: string) {
         </h1>
 
         <!-- Crisp Tagline -->
-        <p class="text-base sm:text-lg text-slate-300 max-w-xl font-normal leading-relaxed mb-8">
+        <p class="text-base sm:text-lg text-slate-300 max-w-xl font-normal leading-relaxed mb-6 sm:mb-8">
           Architecting high-performance web systems and deep learning models.
           International engineering background spanning <span class="text-neon-blue font-semibold">Japan</span>,
           <span class="text-neon-blue font-semibold">Taiwan</span>, and enterprise HR tech.
         </p>
 
         <!-- Kinetic Action Buttons -->
-        <div class="flex flex-wrap items-center gap-4 mb-10">
+        <div class="flex flex-wrap items-center gap-3 sm:gap-4 mb-6 sm:mb-10">
           <a
             href="/Mohammad_Al_Furqon_CV.pdf"
             download="Mohammad_Al_Furqon_CV.pdf"
@@ -142,7 +146,7 @@ function scrollTo(selector: string) {
 
       <!-- Right Column: 3D Holographic Reticle Frame (Frames the Master 3D Gyro Core) -->
       <div
-        class="lg:col-span-5 relative flex items-center justify-center pointer-events-none transition-all duration-100 ease-out"
+        class="hidden lg:col-span-5 relative lg:flex items-center justify-center pointer-events-none"
         :style="{
           opacity: stageOpacity.toFixed(2),
         }"

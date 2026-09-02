@@ -8,8 +8,14 @@ import {
   JOURNEY_STATIONS,
   clamp01,
   computeJourneyProgress,
+  DOLLY_IN_END,
+  DOLLY_OUT_SPAN,
+  FINAL_EXIT_SPAN,
+  FINAL_EXIT_START,
   flightRaw,
   lerp,
+  NEAR_Z_FACTOR,
+  NEAR_Z_MIN,
   smooth01,
 } from '@/composables/useJourney'
 
@@ -64,7 +70,7 @@ let currentArchiveSpin = 0
 // -> the camera pulls out onto it. The next shape has zero opacity until the
 // swarm has almost finished building it, so it is never sitting there in
 // advance waiting to be zoomed at.
-const MORPH_COUNT = 5600
+const MORPH_COUNT = 12000
 let morphPoints: THREE.Points | null = null
 let morphGeo: THREE.BufferGeometry | null = null
 let morphPos: Float32Array | null = null
@@ -869,8 +875,11 @@ function layoutOffset(el: HTMLElement | null) {
  */
 function measureFrames() {
   if (!viewW || !viewH) return
+  // The frames only exist on the desktop layout. Below that the artifact is a
+  // centred backdrop behind the stacked copy, sized by the station's own dwell.
+  const framed = viewW >= 1024
   frameFits = JOURNEY_STATIONS.map((cfg, i) => {
-    if (!cfg.frame || !cfg.section) return null
+    if (!framed || !cfg.frame || !cfg.section) return null
     const frame = document.querySelector(cfg.frame) as HTMLElement | null
     const section = document.querySelector(cfg.section) as HTMLElement | null
     const extent = morphExtents[i]
@@ -904,8 +913,6 @@ function measureFrames() {
  * units and the frame half-height at that camera distance is ~3.7, so a rise
  * of 16 carries it clear with margin to spare.
  */
-const FINAL_EXIT_START = 0.5
-const FINAL_EXIT_SPAN = 0.42
 const FINAL_EXIT_RISE = 16
 
 /** Desktop stages the artifact beside the copy; narrow screens centre it. */
@@ -967,17 +974,19 @@ function renderLoop(time = 0) {
   const dwellHere = fitHere ? fitHere.dwell : here.dwell * dwellScale
   const dwellThere = fitThere ? fitThere.dwell : there.dwell * dwellScale
   // Close enough that the loose swarm fills the frame, but still outside it —
-  // pushing further in only opens a hole in the middle of the cloud.
-  const nearZ = Math.max(2.6, Math.min(dwellHere, dwellThere) * 0.45)
+  // pushing further in only opens a hole in the middle of the cloud. Built
+  // from the dolly constants shared with useJourneyStage, so the section copy
+  // is magnified by this exact same move rather than an approximation of it.
+  const nearZ = Math.max(NEAR_Z_MIN, Math.min(dwellHere, dwellThere) * NEAR_Z_FACTOR)
 
   // Dive while the artifact is coming apart, hold closest through the loose
   // swarm, then settle onto the next artifact by 0.86. The last stretch is
   // deliberately dead air: the artifact is parked and finished while the
   // section copy fades up over it.
   const targetZ =
-    morph < 0.45
-      ? lerp(dwellHere, nearZ, smooth01(morph / 0.45))
-      : lerp(nearZ, dwellThere, smooth01((morph - 0.45) / 0.41))
+    morph < DOLLY_IN_END
+      ? lerp(dwellHere, nearZ, smooth01(morph / DOLLY_IN_END))
+      : lerp(nearZ, dwellThere, smooth01((morph - DOLLY_IN_END) / DOLLY_OUT_SPAN))
 
   camZ = approach(camZ, targetZ, 6.5, dt)
 
@@ -1123,7 +1132,10 @@ function renderLoop(time = 0) {
     // Barely there on a solid artifact (the sub-parts spin independently of
     // the station matrix, so resting points drift a little off the geometry),
     // and the entire show once it is in pieces.
-    mat.opacity = 0.16 + loose * 0.8
+    //
+    // The closing station is the exception: it has no mesh at all, so the
+    // debris field IS the visual there and gets to stay bright.
+    mat.opacity = idx >= lastIdx ? 0.72 : 0.16 + loose * 0.8
   }
 
   // ═════════════════════════════════════════════════════════════

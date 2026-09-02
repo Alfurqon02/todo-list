@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { organizations } from '@/data/portfolioData'
+import { useJourneyShards, useJourneyStage } from '@/composables/useJourney'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import {
@@ -16,22 +17,15 @@ import {
 gsap.registerPlugin(ScrollTrigger)
 
 const sectionRef = ref<HTMLElement | null>(null)
-const scrollProgress = ref(0)
 let scrollTriggerInstance: ScrollTrigger | null = null
 
-const zoomScale = computed(() => {
-  const p = scrollProgress.value
-  if (p < 0.15) {
-    return 1.25 - 0.25 * (p / 0.15)
-  }
-  return 1.0
-})
+// Was the only journey section running its own bespoke zoom, which is why it
+// looked static next to the others. Now on the shared choreography: it arrives
+// on the research flight and sheds its blocks as the debris lifts away.
+const { opacity: stageOpacity, scale: stageScale, filter: stageFilter } = useJourneyStage(5)
 
-const transitionOpacity = computed(() => {
-  const p = scrollProgress.value
-  if (p < 0.1) return Math.max(0.2, p / 0.1)
-  return 1.0
-})
+const copyRef = ref<HTMLElement | null>(null)
+useJourneyShards(5, copyRef)
 
 onMounted(async () => {
   await nextTick()
@@ -42,9 +36,6 @@ onMounted(async () => {
       start: 'top 85%',
       end: 'bottom top',
       scrub: 1.0,
-      onUpdate: (self) => {
-        scrollProgress.value = self.progress
-      },
     })
   }
 })
@@ -64,10 +55,12 @@ onBeforeUnmount(() => {
     class="relative py-24 px-4 sm:px-8 md:px-16 bg-transparent border-t border-cyan-500/15 overflow-hidden"
   >
     <div
-      class="max-w-6xl mx-auto transition-transform duration-100 ease-out"
+      ref="copyRef"
+      class="max-w-6xl mx-auto"
       :style="{
-        transform: `scale(${zoomScale.toFixed(3)})`,
-        opacity: transitionOpacity.toFixed(2),
+        transform: `scale(${stageScale.toFixed(3)})`,
+        opacity: stageOpacity.toFixed(2),
+        filter: stageFilter,
       }"
     >
       <!-- Section Header -->

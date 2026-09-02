@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useCyberAudio } from '@/composables/useCyberAudio'
 import { useExperienceStore } from '@/stores/experienceStore'
-import { contentProgress, useJourneyStage } from '@/composables/useJourney'
+import { contentProgress, useJourneyShards, useJourneyStage } from '@/composables/useJourney'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import {
@@ -22,7 +22,10 @@ let scrollTriggerInstance: ScrollTrigger | null = null
 
 // Copy is choreographed off the shared journey position, so the stage arrives
 // and departs in lockstep with the camera rather than on its own local curve.
-const { opacity: stageOpacity, scale: stageScale } = useJourneyStage(4)
+const { opacity: stageOpacity, scale: stageScale, filter: stageFilter } = useJourneyStage(4)
+
+const copyRef = ref<HTMLElement | null>(null)
+useJourneyShards(4, copyRef)
 
 const researchProjects = [
   {
@@ -64,10 +67,13 @@ onMounted(async () => {
       pin: true,
       anticipatePin: 1,
       scrub: 1.2,
-      onUpdate: (self) => {
-        // The second publication used to appear at 50% and the section started
-        // fading at 58%, leaving it on screen for a sliver of the scroll.
-        const visible = contentProgress(4, self.progress)
+    })
+
+    // Journey-driven, for the same reason as the experience carousel.
+    watch(
+      () => store.journeyProgress,
+      (p) => {
+        const visible = contentProgress(4, p)
         const calculatedIndex = visible > 0.5 ? 1 : 0
         if (calculatedIndex !== activeIndex.value) {
           activeIndex.value = calculatedIndex
@@ -75,7 +81,8 @@ onMounted(async () => {
           audio.playTick()
         }
       },
-    })
+      { immediate: true }
+    )
   }
 })
 
@@ -91,7 +98,7 @@ onBeforeUnmount(() => {
   <div ref="sectionRef" id="research" class="relative w-full h-screen overflow-hidden bg-transparent flex flex-col justify-between select-none px-4 sm:px-8 md:px-16 border-t border-cyan-500/15">
     <!-- Top Telemetry Header -->
     <div
-      class="relative z-20 pt-20 max-w-6xl mx-auto w-full flex items-center justify-between pointer-events-none transition-opacity duration-150"
+      class="relative z-20 pt-20 max-w-6xl mx-auto w-full flex items-center justify-between pointer-events-none"
       :style="{ opacity: stageOpacity.toFixed(2) }"
     >
       <div>
@@ -112,14 +119,15 @@ onBeforeUnmount(() => {
 
     <!-- Center Stage: Frame for Master 3D Holographic Prism + Blueprint Cards -->
     <div
-      class="relative z-10 max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center transition-transform duration-100 ease-out"
+      class="relative z-10 max-w-6xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center"
       :style="{
         transform: `scale(${stageScale.toFixed(3)})`,
         opacity: stageOpacity.toFixed(2),
+        filter: stageFilter,
       }"
     >
       <!-- Left: Frame area for Master 3D Hologram Prism Canvas (5 cols) -->
-      <div class="lg:col-span-5 flex items-center justify-center relative pointer-events-none">
+      <div class="hidden lg:col-span-5 lg:flex items-center justify-center relative pointer-events-none">
         <div class="artifact-frame w-full max-w-[340px] aspect-square relative flex items-center justify-center">
           <div class="w-56 h-56 rounded-lg border border-cyan-500/25 animate-spin" style="animation-duration: 25s;" />
           <div class="w-64 h-64 rounded-full border border-dashed border-cyan-500/15 animate-spin" style="animation-duration: 35s; animation-direction: reverse;" />
@@ -132,7 +140,7 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- Right: Active Blueprint Card (7 cols) -->
-      <div class="lg:col-span-7">
+      <div ref="copyRef" class="lg:col-span-7">
         <article
           class="cyber-card p-6 sm:p-8 border-neon-blue shadow-[0_0_35px_rgba(0,243,255,0.25)] laser-scan-container transition-all duration-300 backdrop-blur-sm"
         >
@@ -186,7 +194,7 @@ onBeforeUnmount(() => {
 
     <!-- Bottom Scroll Cue -->
     <div
-      class="relative z-20 pb-8 px-6 flex flex-col items-center gap-2 pointer-events-none transition-opacity duration-150"
+      class="relative z-20 pb-8 px-6 flex flex-col items-center gap-2 pointer-events-none"
       :style="{ opacity: stageOpacity.toFixed(2) }"
     >
       <div class="flex items-center gap-2 text-xs font-mono text-slate-400 bg-abyss/85 px-4 py-1 border border-cyan-500/20 rounded-full backdrop-blur-sm">

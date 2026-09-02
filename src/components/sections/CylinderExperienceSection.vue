@@ -1,9 +1,15 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { experiences, type Experience } from '@/data/portfolioData'
 import { useCyberAudio } from '@/composables/useCyberAudio'
 import { useExperienceStore } from '@/stores/experienceStore'
-import { contentProgress, useJourneyStage } from '@/composables/useJourney'
+import {
+  contentProgress,
+  journeyPhase,
+  shardPull,
+  useJourneyShards,
+  useJourneyStage,
+} from '@/composables/useJourney'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import {
@@ -42,7 +48,38 @@ function updateRadius() {
 
 // Copy is choreographed off the shared journey position, so the stage arrives
 // and departs in lockstep with the camera rather than on its own local curve.
-const { opacity: stageOpacity, scale: stageScale } = useJourneyStage(2)
+// No `filter` on the carousel stage: it relies on transform-style: preserve-3d
+// and a CSS filter would flatten the whole drum. Only the flat header and
+// scroll cue take the blur.
+const { opacity: stageOpacity, scale: stageScale, filter: stageFilter } = useJourneyStage(2)
+
+// The header rides the same consume/emit choreography as every other section.
+const headerRef = ref<HTMLElement | null>(null)
+useJourneyShards(2, headerRef)
+
+/**
+ * The cards ARE this section's detail, so they are what the tower has to eat.
+ *
+ * They cannot go through useJourneyShards: each card already carries its own
+ * 3D cylinder transform, and a second transform on the same element would
+ * simply replace it. Instead the pull is folded into that transform here —
+ * the card's cylinder position is drawn back toward the stage origin, which is
+ * exactly where the tower stands, so they collapse into it and are released
+ * back out of it on the same schedule as every other section's copy.
+ */
+const cardPhase = computed(() => journeyPhase(2, store.journeyProgress))
+const cardsLive = computed(() => store.animationsEnabled && store.mode === 'immersive')
+
+/**
+ * Tilt of the carousel axis, in degrees.
+ *
+ * The transform below reads left to right in the card's own frame: rotateZ
+ * swings the whole travel line, the translate rides along it, rotateY keeps the
+ * card tangent to the drum, and the final rotateZ levels the card back up so the
+ * text stays horizontal. CSS +y points down, so a positive tilt sends incoming
+ * cards (+x) to the bottom right and carries them out through the top left.
+ */
+const CAROUSEL_TILT = 22
 
 // Compute 3D cylinder transform for each card (Rule 4.2)
 function getTransform(index: number) {
@@ -55,14 +92,29 @@ function getTransform(index: number) {
   const rotationY = -(angle * 180) / Math.PI
 
   const depthNormalized = (cosA + 1) / 2
-  const isFront = cosA > 0.55
   const opacity = Math.max(0.08, Math.pow(depthNormalized, 1.8))
   const scale = 0.82 + 0.22 * Math.max(0, cosA)
   const zIndex = Math.round(depthNormalized * 100)
 
+  // 0 while the section is parked, 1 once this card is inside the tower.
+  // Staggered per card, so the tower takes them one at a time.
+  const pull = cardsLive.value
+    ? shardPull(cardPhase.value, totalCount > 1 ? index / (totalCount - 1) : 0)
+    : 0
+
+  const remain = 1 - pull
+  const spin = (index % 2 === 0 ? 1 : -1) * (18 + (index % 3) * 9) * pull
+  // Not clickable once it has started being drawn in.
+  const isFront = cosA > 0.55 && pull < 0.15
+
   return {
-    transform: `translate3d(${x.toFixed(2)}px, 0px, ${z.toFixed(2)}px) rotateY(${rotationY.toFixed(2)}deg) scale(${scale.toFixed(3)})`,
-    opacity,
+    transform:
+      `rotateZ(${CAROUSEL_TILT}deg) ` +
+      `translate3d(${(x * remain).toFixed(2)}px, 0px, ${(z * remain).toFixed(2)}px) ` +
+      `rotateY(${(rotationY * remain).toFixed(2)}deg) ` +
+      `rotateZ(${(-CAROUSEL_TILT + spin).toFixed(2)}deg) ` +
+      `scale(${(scale * (1 - pull * 0.88)).toFixed(3)})`,
+    opacity: opacity * (1 - pull * 0.82),
     zIndex,
     isFront,
   }
@@ -84,12 +136,15 @@ onMounted(async () => {
       pin: true,
       anticipatePin: 1,
       scrub: 1.2,
-      onUpdate: (self) => {
-        // The carousel has to complete inside the window where this section is
-        // still on screen. Spreading it over the section's whole scroll meant
-        // the last roles rotated past after the copy had already faded out —
-        // you never got past role 8 or 9 of 11.
-        const visible = contentProgress(2, self.progress)
+    })
+
+    // Driven off the shared journey position rather than this trigger's own
+    // progress: the two are different lengths, and using the pin left the
+    // cylinder frozen on its last role for the final 594px of the section.
+    watch(
+      () => store.journeyProgress,
+      (p) => {
+        const visible = contentProgress(2, p)
         currentAngle.value = -visible * totalRotationAngle
         store.carouselRotation = currentAngle.value
 
@@ -105,7 +160,8 @@ onMounted(async () => {
           audio.playTick()
         }
       },
-    })
+      { immediate: true }
+    )
   }
 })
 
@@ -142,8 +198,13 @@ function closeInspector() {
   <div ref="sectionRef" id="experience" class="relative w-full h-screen overflow-hidden bg-transparent flex flex-col justify-between select-none">
     <!-- Top Telemetry Header -->
     <div
-      class="relative z-20 pt-20 px-6 md:px-16 max-w-6xl mx-auto w-full flex items-center justify-between pointer-events-none transition-opacity duration-150"
-      :style="{ opacity: stageOpacity.toFixed(2) }"
+      ref="headerRef"
+      class="relative z-20 pt-20 px-6 md:px-16 max-w-6xl mx-auto w-full flex items-center justify-between pointer-events-none"
+      :style="{
+        opacity: stageOpacity.toFixed(2),
+        transform: `scale(${stageScale.toFixed(3)})`,
+        filter: stageFilter,
+      }"
     >
       <div>
         <div class="flex items-center gap-2 font-mono text-xs text-neon-blue mb-1">
@@ -165,7 +226,7 @@ function closeInspector() {
 
     <!-- Center 3D Stage (Cards Orbiting Master 3D Pillar) -->
     <div
-      class="relative z-10 w-full flex-1 flex items-center justify-center overflow-visible transition-transform duration-100 ease-out"
+      class="relative z-10 w-full flex-1 flex items-center justify-center overflow-visible"
       :style="{
         perspective: '1200px',
         transformStyle: 'preserve-3d',
@@ -241,8 +302,8 @@ function closeInspector() {
 
     <!-- Bottom Scroll Cue -->
     <div
-      class="relative z-20 pb-8 px-6 flex flex-col items-center gap-2 pointer-events-none transition-opacity duration-150"
-      :style="{ opacity: stageOpacity.toFixed(2) }"
+      class="relative z-20 pb-8 px-6 flex flex-col items-center gap-2 pointer-events-none"
+      :style="{ opacity: stageOpacity.toFixed(2), filter: stageFilter }"
     >
       <div class="flex items-center gap-2 text-xs font-mono text-slate-400 bg-abyss/85 px-4 py-1 border border-cyan-500/20 rounded-full backdrop-blur-sm">
         <span class="w-1.5 h-1.5 rounded-full bg-neon-blue animate-ping" />
