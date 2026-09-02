@@ -77,7 +77,7 @@ onMounted(async () => {
 
       <!-- Terminal System Status -->
       <p class="loader-status">
-        &gt; BOOTING ROBOTICS_CYLINDER // MOHAMMAD AL FURQON
+        &gt; BOOTING // MOHAMMAD AL FURQON
       </p>
     </div>
   </div>
