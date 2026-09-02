@@ -299,6 +299,8 @@ export const skills: SkillCategory[] = [
   },
 ]
 
+export const technicalSkills = skills
+
 // ============================================
 // LANGUAGES
 // ============================================

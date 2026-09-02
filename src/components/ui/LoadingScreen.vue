@@ -1,38 +1,47 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import gsap from 'gsap'
 
 const isVisible = ref(true)
 const progress = ref(0)
 const counterEl = ref<HTMLElement | null>(null)
+const screenEl = ref<HTMLElement | null>(null)
+const contentEl = ref<HTMLElement | null>(null)
 
-onMounted(() => {
-  // Animate progress counter
+onMounted(async () => {
+  await nextTick()
+  if (!screenEl.value || !contentEl.value) return
+
   const tl = gsap.timeline({
     onComplete: () => {
-      // Reveal animation
-      gsap.to('.loader-content', {
-        y: -40,
-        opacity: 0,
-        duration: 0.5,
-        ease: 'power2.in',
-      })
-      gsap.to('.loader-screen', {
-        clipPath: 'inset(0% 0% 100% 0%)',
-        duration: 0.8,
-        ease: 'power4.inOut',
-        delay: 0.3,
-        onComplete: () => {
-          isVisible.value = false
-        },
-      })
+      if (contentEl.value) {
+        gsap.to(contentEl.value, {
+          y: -30,
+          opacity: 0,
+          duration: 0.4,
+          ease: 'power2.in',
+        })
+      }
+      if (screenEl.value) {
+        gsap.to(screenEl.value, {
+          clipPath: 'inset(0% 0% 100% 0%)',
+          duration: 0.6,
+          ease: 'power4.inOut',
+          delay: 0.2,
+          onComplete: () => {
+            isVisible.value = false
+          },
+        })
+      } else {
+        isVisible.value = false
+      }
     },
   })
 
-  // Count 0 → 100
+  // Fast cyber loader 0 -> 100
   tl.to(progress, {
     value: 100,
-    duration: 1.8,
+    duration: 1.2,
     ease: 'power2.inOut',
     onUpdate: () => {
       if (counterEl.value) {
@@ -41,21 +50,20 @@ onMounted(() => {
     },
   })
 
-  // Animate the crystal lines
   tl.to('.loader-line', {
     scaleX: 1,
-    duration: 1.2,
-    stagger: 0.15,
+    duration: 0.8,
+    stagger: 0.1,
     ease: 'power3.out',
-  }, 0.3)
+  }, 0.2)
 })
 </script>
 
 <template>
-  <div v-if="isVisible" class="loader-screen">
-    <div class="loader-content">
-      <!-- Crystal line pattern -->
-      <div class="loader-crystal">
+  <div v-if="isVisible" ref="screenEl" class="loader-screen">
+    <div ref="contentEl" class="loader-content">
+      <!-- Cyber Circuit Lines -->
+      <div class="loader-circuit">
         <div class="loader-line" />
         <div class="loader-line loader-line--mid" />
         <div class="loader-line" />
@@ -67,8 +75,10 @@ onMounted(() => {
         <span class="loader-percent">%</span>
       </div>
 
-      <!-- Name reveal -->
-      <p class="loader-name">FURQON</p>
+      <!-- Terminal System Status -->
+      <p class="loader-status">
+        &gt; BOOTING ROBOTICS_CYLINDER // MOHAMMAD AL FURQON
+      </p>
     </div>
   </div>
 </template>
@@ -78,7 +88,7 @@ onMounted(() => {
   position: fixed;
   inset: 0;
   z-index: 100000;
-  background: var(--bg-primary);
+  background: #030712;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -89,28 +99,29 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 24px;
+  gap: 20px;
 }
 
-.loader-crystal {
+.loader-circuit {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  width: 120px;
+  gap: 6px;
+  width: 140px;
 }
 
 .loader-line {
-  width: 60px;
-  height: 1px;
-  background: var(--accent-cyan);
+  width: 70px;
+  height: 1.5px;
+  background: #00f3ff;
+  box-shadow: 0 0 8px #00f3ff;
   transform: scaleX(0);
   transform-origin: center;
 }
 
 .loader-line--mid {
-  width: 120px;
-  opacity: 0.5;
+  width: 140px;
+  opacity: 0.6;
 }
 
 .loader-counter {
@@ -121,24 +132,25 @@ onMounted(() => {
 }
 
 .loader-number {
-  font-size: 3rem;
-  font-weight: 200;
+  font-size: 3.5rem;
+  font-weight: 300;
   letter-spacing: -0.05em;
-  color: var(--text-primary);
+  color: #ffffff;
   line-height: 1;
 }
 
 .loader-percent {
-  font-size: 1rem;
-  color: var(--accent-cyan);
-  font-weight: 300;
+  font-size: 1.25rem;
+  color: #00f3ff;
+  font-weight: 400;
 }
 
-.loader-name {
-  font-size: 0.65rem;
-  letter-spacing: 0.4em;
+.loader-status {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: var(--text-secondary);
-  font-weight: 400;
+  color: #00f3ff;
+  opacity: 0.85;
 }
 </style>

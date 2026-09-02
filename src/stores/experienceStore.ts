@@ -6,7 +6,7 @@ export type ExperienceMode = 'immersive' | 'clean'
 
 export const useExperienceStore = defineStore('experience', () => {
   // ==========================================
-  // DARK MODE (synced via VueUse useDark)
+  // DARK THEME (Always dark for Cybernetics theme)
   // ==========================================
   const isDark = useDark({
     selector: 'body',
@@ -14,43 +14,74 @@ export const useExperienceStore = defineStore('experience', () => {
     valueDark: 'dark',
     valueLight: '',
   })
+  isDark.value = true
   const toggleDark = useToggle(isDark)
 
   // ==========================================
-  // EXPERIENCE MODE — always immersive by default
-  // No modal, user can toggle via navbar
+  // ONBOARDING BOOT MODAL
+  // ==========================================
+  const modalDismissed = useStorage<boolean>('portfolio-boot-dismissed', false)
+  const showModeModal = ref(!modalDismissed.value)
+
+  // ==========================================
+  // EXPERIENCE MODE (Cyber-Carousel vs Terminal Log)
   // ==========================================
   const storedMode = useStorage<ExperienceMode>('portfolio-mode', 'immersive')
   const mode = ref<ExperienceMode>(storedMode.value)
 
-  // Rule 1.2: Reduced motion → default to clean mode
+  // Rule 1.2: Reduced motion -> default to clean mode
   const reducedMotion = usePreferredReducedMotion()
   if (reducedMotion.value === 'reduce') {
     mode.value = 'clean'
     storedMode.value = 'clean'
   }
 
+  // Audio SFX state
+  const soundEnabled = useStorage<boolean>('portfolio-sound', false)
+
+  // Active Orbit Node
+  const activeNodeIndex = ref(0)
+
+  // Total nodes in carousel
+  const totalNodes = ref(11)
+
+  // Global carousel rotation angle
+  const carouselRotation = ref(0)
+
+  // Continuous 3D Chained Journey progress (0.0 to 5.0)
+  const journeyProgress = ref(0)
+  const activeSkillIndex = ref(0)
+  const activeResearchIndex = ref(0)
+
   // Sync mode changes to storage
   watch(mode, (newMode) => {
     storedMode.value = newMode
   })
 
-  function setMode(newMode: ExperienceMode) {
+  function setMode(newMode: ExperienceMode, remember = true) {
     mode.value = newMode
+    if (remember) {
+      storedMode.value = newMode
+      modalDismissed.value = true
+    }
+    showModeModal.value = false
   }
 
   function toggleMode() {
     mode.value = mode.value === 'immersive' ? 'clean' : 'immersive'
   }
 
-  // ==========================================
-  // SCROLL PROGRESS (for 3D reactions)
-  // ==========================================
-  const scrollProgress = ref(0)
+  function toggleSound() {
+    soundEnabled.value = !soundEnabled.value
+  }
 
-  function updateScrollProgress() {
-    const docHeight = document.documentElement.scrollHeight - window.innerHeight
-    scrollProgress.value = docHeight > 0 ? window.scrollY / docHeight : 0
+  function openBootModal() {
+    showModeModal.value = true
+  }
+
+  function closeBootModal() {
+    showModeModal.value = false
+    modalDismissed.value = true
   }
 
   // ==========================================
@@ -75,7 +106,7 @@ export const useExperienceStore = defineStore('experience', () => {
         const fps = fpsFrames
         fpsFrames = 0
         fpsLastTime = now
-        if (fps < 30) {
+        if (fps < 28) {
           lowFpsCount++
           if (lowFpsCount >= 3) {
             showFpsWarning.value = true
@@ -103,18 +134,36 @@ export const useExperienceStore = defineStore('experience', () => {
     showFpsWarning.value = false
   }
 
+  // ==========================================
+  // SCROLL PROGRESS (for 3D reactions)
+  // ==========================================
+  const scrollProgress = ref(0)
+
+  function updateScrollProgress() {
+    if (typeof window === 'undefined') return
+    const docHeight = document.documentElement.scrollHeight - window.innerHeight
+    scrollProgress.value = docHeight > 0 ? window.scrollY / docHeight : 0
+  }
+
   return {
-    // Dark mode
     isDark,
     toggleDark,
-    // Experience mode
     mode,
     setMode,
     toggleMode,
-    // Scroll
+    showModeModal,
+    openBootModal,
+    closeBootModal,
+    soundEnabled,
+    toggleSound,
+    activeNodeIndex,
+    totalNodes,
+    carouselRotation,
+    journeyProgress,
+    activeSkillIndex,
+    activeResearchIndex,
     scrollProgress,
     updateScrollProgress,
-    // FPS
     showFpsWarning,
     startFpsMonitor,
     stopFpsMonitor,

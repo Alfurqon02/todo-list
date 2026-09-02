@@ -3,39 +3,46 @@
 @tailwind utilities;
 
 /* ============================================
-   GLACIER / ICE PORTFOLIO — CSS CUSTOM PROPERTIES
+   CYBERNETICS & ROBOTICS PALETTE (rules.md)
    ============================================ */
 
 :root {
-  --bg-primary: #f4f9fd;
-  --bg-secondary: #e2eef7;
-  --text-primary: #0a2540;
-  --text-secondary: #425466;
-  --accent-cyan: #0077b6;
-  --accent-ice: #00b4d8;
-  --card-bg: rgba(255, 255, 255, 0.75);
-  --card-border: rgba(0, 119, 182, 0.15);
-  --frost-blur: blur(12px);
-  --gradient-accent: linear-gradient(135deg, #0077b6, #00b4d8);
-  --gradient-hero: linear-gradient(180deg, #f4f9fd, #eaf2f8);
+  --bg-abyss: #030712;
+  --bg-cyber: #0a0f1d;
+  --bg-cyber-surface: rgba(10, 15, 29, 0.75);
+  --text-main: #e2e8f0;
+  --text-muted: #64748b;
+  --neon-blue: #00f3ff;
+  --electric-blue: #0096ff;
+  --hud-border: rgba(0, 243, 255, 0.3);
+  --hud-bg: rgba(3, 7, 18, 0.85);
+  --neon-glow: 0 0 10px rgba(0, 243, 255, 0.5), 0 0 20px rgba(0, 243, 255, 0.25);
+  --neon-glow-strong: 0 0 15px rgba(0, 243, 255, 0.8), 0 0 35px rgba(0, 150, 255, 0.5);
+
+  /* Compatibility bindings */
+  --bg-primary: var(--bg-abyss);
+  --bg-secondary: var(--bg-cyber);
+  --text-primary: var(--text-main);
+  --text-secondary: var(--text-muted);
+  --accent-cyan: var(--neon-blue);
+  --accent-ice: var(--electric-blue);
+  --card-bg: var(--hud-bg);
+  --card-border: var(--hud-border);
 }
 
 .dark {
-  --bg-primary: #070f1e;
-  --bg-secondary: #0b192c;
-  --text-primary: #f0f8ff;
-  --text-secondary: #94a3b8;
-  --accent-cyan: #00d2ff;
-  --accent-ice: #90e0ef;
-  --card-bg: rgba(11, 25, 44, 0.65);
-  --card-border: rgba(0, 210, 255, 0.2);
-  --frost-blur: blur(16px);
-  --gradient-accent: linear-gradient(135deg, #00d2ff, #90e0ef);
-  --gradient-hero: linear-gradient(180deg, #070f1e, #0b192c);
+  --bg-abyss: #030712;
+  --bg-cyber: #0a0f1d;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --neon-blue: #00f3ff;
+  --electric-blue: #0096ff;
+  --hud-border: rgba(0, 243, 255, 0.35);
+  --hud-bg: rgba(3, 7, 18, 0.85);
 }
 
 /* ============================================
-   BASE STYLES
+   BASE RESET & TYPOGRAPHY
    ============================================ */
 
 * {
@@ -46,196 +53,261 @@
 
 html {
   scroll-behavior: smooth;
+  background-color: var(--bg-abyss);
+  color: var(--text-main);
+  font-family: 'Rajdhani', 'Inter', system-ui, sans-serif;
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  transition: background-color 0.5s ease, color 0.5s ease;
+  background-color: var(--bg-abyss);
+  color: var(--text-main);
   overflow-x: hidden;
+  min-height: 100vh;
 }
 
-::selection {
-  background-color: rgba(0, 210, 255, 0.3);
-  color: var(--text-primary);
-}
-
-/* ============================================
-   SCROLLBAR
-   ============================================ */
-
+/* Cybernetic Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
+  background: #030712;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--accent-cyan);
-  border-radius: 3px;
+  background: rgba(0, 243, 255, 0.4);
+  border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-ice);
+  background: #00f3ff;
+  box-shadow: 0 0 10px #00f3ff;
 }
 
 /* ============================================
-   GLASSMORPHISM UTILITIES
+   CYBERNETIC & ROBOTICS UTILITIES
    ============================================ */
 
 @layer components {
-  .glass-card {
-    background: var(--card-bg);
-    backdrop-filter: var(--frost-blur);
-    -webkit-backdrop-filter: var(--frost-blur);
-    border: 1px solid var(--card-border);
-    border-radius: 16px;
-    transition: all 0.3s ease;
+  /* Clipped Corner HUD Cards */
+  .cyber-card {
+    background: var(--hud-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--hud-border);
+    position: relative;
+    clip-path: polygon(
+      0 0,
+      calc(100% - 14px) 0,
+      100% 14px,
+      100% 100%,
+      14px 100%,
+      0 calc(100% - 14px)
+    );
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  .glass-card:hover {
-    border-color: var(--accent-cyan);
-    box-shadow: 0 8px 32px rgba(0, 210, 255, 0.1);
-    transform: translateY(-2px);
+  .cyber-card:hover {
+    border-color: var(--neon-blue);
+    box-shadow: var(--neon-glow);
   }
 
-  .frost-glow {
-    box-shadow: 0 0 20px rgba(0, 210, 255, 0.15),
-                0 0 60px rgba(0, 210, 255, 0.05);
+  /* Cyber Card Corner Accents */
+  .cyber-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 8px;
+    height: 8px;
+    border-top: 2px solid var(--neon-blue);
+    border-left: 2px solid var(--neon-blue);
+    pointer-events: none;
   }
 
-  .text-gradient,
-  .text-gradient .word,
-  .text-gradient .char {
-    background: var(--gradient-accent);
+  .cyber-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 8px;
+    height: 8px;
+    border-bottom: 2px solid var(--neon-blue);
+    border-right: 2px solid var(--neon-blue);
+    pointer-events: none;
+  }
+
+  /* HUD Cut-Corner Button */
+  .hud-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1.25rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: rgba(0, 243, 255, 0.06);
+    border: 1px solid var(--hud-border);
+    color: var(--neon-blue);
+    clip-path: polygon(
+      0 0,
+      calc(100% - 8px) 0,
+      100% 8px,
+      100% 100%,
+      8px 100%,
+      0 calc(100% - 8px)
+    );
+    transition: all 0.25s ease;
+    cursor: pointer;
+  }
+
+  .hud-btn:hover {
+    background: rgba(0, 243, 255, 0.18);
+    border-color: var(--neon-blue);
+    color: #ffffff;
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.5);
+    transform: translateY(-1px);
+  }
+
+  .hud-btn-primary {
+    background: linear-gradient(135deg, rgba(0, 243, 255, 0.3), rgba(0, 150, 255, 0.2));
+    border-color: var(--neon-blue);
+    color: #ffffff;
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.35);
+  }
+
+  .hud-btn-primary:hover {
+    background: linear-gradient(135deg, rgba(0, 243, 255, 0.5), rgba(0, 150, 255, 0.4));
+    box-shadow: 0 0 25px rgba(0, 243, 255, 0.7);
+  }
+
+  /* Neon Text Utilities */
+  .text-neon {
+    color: var(--neon-blue);
+    text-shadow: 0 0 10px rgba(0, 243, 255, 0.6), 0 0 20px rgba(0, 243, 255, 0.3);
+  }
+
+  .text-electric {
+    color: var(--electric-blue);
+    text-shadow: 0 0 10px rgba(0, 150, 255, 0.6);
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, #00f3ff 0%, #0096ff 50%, #e2e8f0 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
-
-  .btn-frost {
-    @apply px-6 py-3 rounded-xl font-semibold transition-all duration-300;
-    background: var(--card-bg);
-    backdrop-filter: var(--frost-blur);
-    border: 1px solid var(--card-border);
-    color: var(--accent-cyan);
-    cursor: pointer;
-  }
-
-  .btn-frost:hover {
-    border-color: var(--accent-cyan);
-    box-shadow: 0 0 20px rgba(0, 210, 255, 0.2);
-    transform: translateY(-2px);
-  }
-
-  .btn-primary {
-    @apply px-6 py-3 rounded-xl font-semibold transition-all duration-300;
-    background: var(--gradient-accent);
-    color: #fff;
-    border: none;
-    cursor: pointer;
-  }
-
-  .btn-primary:hover {
-    box-shadow: 0 4px 20px rgba(0, 210, 255, 0.4);
-    transform: translateY(-2px);
-  }
-
-  .section-title {
-    @apply text-3xl md:text-4xl font-bold mb-2;
-  }
-
-  .section-subtitle {
-    @apply text-base md:text-lg mb-12;
-    color: var(--text-secondary);
-  }
 }
 
 /* ============================================
-   ANIMATIONS (respect reduced motion)
+   BACKGROUND GRIDS & SCANLINES
    ============================================ */
 
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
+/* High-tech hex grid overlay */
+.cyber-grid-bg {
+  background-image: 
+    linear-gradient(to right, rgba(0, 243, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 243, 255, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
 }
 
-/* ============================================
-   LENIS SMOOTH SCROLL
-   ============================================ */
-
-html.lenis,
-html.lenis body {
-  height: auto;
+/* CRT Scanline Overlay */
+.cyber-scanlines {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 90;
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%, 
+    rgba(0, 0, 0, 0.25) 50%
+  ), linear-gradient(
+    90deg,
+    rgba(255, 0, 0, 0.01),
+    rgba(0, 255, 0, 0.005),
+    rgba(0, 0, 255, 0.01)
+  );
+  background-size: 100% 3px, 6px 100%;
+  opacity: 0.6;
 }
 
-.lenis.lenis-smooth {
-  scroll-behavior: auto !important;
-}
-
-.lenis.lenis-smooth [data-lenis-prevent] {
-  overscroll-behavior: contain;
-}
-
-.lenis.lenis-stopped {
+/* Laser scan effect across cards */
+.laser-scan-container {
+  position: relative;
   overflow: hidden;
 }
 
-/* ============================================
-   FILM GRAIN / NOISE OVERLAY
-   ============================================ */
-
-.noise-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  pointer-events: none;
-  opacity: 0.035;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-  background-size: 128px 128px;
-  mix-blend-mode: overlay;
-}
-
-/* ============================================
-   REVEAL ANIMATION BASE STATES
-   ============================================ */
-
-.reveal-card {
-  clip-path: inset(0% 0% 0% 0%);
-  will-change: clip-path;
-}
-
-/* ============================================
-   SPLIT TYPE OVERRIDES
-   ============================================ */
-
-.word, .char {
-  display: inline-block;
-  will-change: transform, opacity;
-}
-
-/* ============================================
-   3D CANVAS OVERLAY
-   ============================================ */
-
-.ice-canvas-container {
-  position: fixed;
-  top: 0;
+.laser-scan-container::before {
+  content: '';
+  position: absolute;
+  top: -100%;
   left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00f3ff, transparent);
+  box-shadow: 0 0 12px #00f3ff, 0 0 20px #00f3ff;
+  animation: laserSweep 5s ease-in-out infinite;
   pointer-events: none;
+  z-index: 15;
 }
 
-.ice-canvas-container canvas {
-  pointer-events: auto;
+@keyframes laserSweep {
+  0% {
+    top: -10%;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    top: 110%;
+    opacity: 0;
+  }
+}
+
+/* Radar Sweep Animation */
+.radar-sweep-box {
+  position: relative;
+  overflow: hidden;
+}
+
+.radar-sweep-box::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: conic-gradient(from 0deg, transparent 0deg, transparent 300deg, rgba(0, 243, 255, 0.15) 360deg);
+  animation: radarRotate 6s linear infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+@keyframes radarRotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 3D Tilt Card Base */
+.tilt-card {
+  transform-style: preserve-3d;
+  transition: transform 0.15s ease-out, border-color 0.3s ease, box-shadow 0.3s ease;
+  will-change: transform;
+}
+
+.tilt-card-content {
+  transform: translateZ(20px);
 }

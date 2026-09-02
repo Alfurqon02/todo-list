@@ -1,91 +1,97 @@
 <script setup lang="ts">
 import { useExperienceStore } from '@/stores/experienceStore'
 import { useSmoothScroll } from '@/composables/useSmoothScroll'
-import { useScrollAnimations } from '@/composables/useScrollAnimations'
-import { useMagneticButtons } from '@/composables/useMagneticButtons'
-
-// UI Components
 import LoadingScreen from '@/components/ui/LoadingScreen.vue'
 import Navbar from '@/components/ui/Navbar.vue'
-import IceCursor from '@/components/ui/IceCursor.vue'
+import CyberCursor from '@/components/ui/CyberCursor.vue'
+import ModeModal from '@/components/ui/ModeModal.vue'
+import GlobalCanvas from '@/components/3d/GlobalCanvas.vue'
 
-// 3D Components
-import IceCanvas from '@/components/3d/IceCanvas.vue'
-import SnowParticles from '@/components/3d/SnowParticles.vue'
+// Immersive Cyber Sections (Mode A)
+import CyberHeroSection from '@/components/sections/CyberHeroSection.vue'
+import CyberAboutSection from '@/components/sections/CyberAboutSection.vue'
+import CylinderExperienceSection from '@/components/sections/CylinderExperienceSection.vue'
+import CyberSkillsSection from '@/components/sections/CyberSkillsSection.vue'
+import CyberResearchSection from '@/components/sections/CyberResearchSection.vue'
+import CyberOrgsSection from '@/components/sections/CyberOrgsSection.vue'
+import CyberContactSection from '@/components/sections/CyberContactSection.vue'
 
-// Sections
-import HeroSection from '@/components/sections/HeroSection.vue'
-import AboutSection from '@/components/sections/AboutSection.vue'
-import ExperienceSection from '@/components/sections/ExperienceSection.vue'
-import SkillsSection from '@/components/sections/SkillsSection.vue'
-import ContactSection from '@/components/sections/ContactSection.vue'
+// Clean / Recruiter Mode (Mode B)
+import TerminalLogView from '@/components/sections/TerminalLogView.vue'
 
 const store = useExperienceStore()
 
-// Foundation
+// Initialize Lenis continuous smooth scrolling synchronized with GSAP ScrollTrigger
 useSmoothScroll()
-useScrollAnimations()
-useMagneticButtons()
 </script>
 
 <template>
-  <div class="app-root min-h-screen" style="background: var(--bg-primary); color: var(--text-primary)">
-    <!-- Loading Screen -->
+  <div class="app-root min-h-screen bg-abyss text-slate-200 overflow-x-hidden font-rajdhani">
+    <!-- Boot-up Loading Screen -->
     <LoadingScreen />
 
-    <!-- Custom Ice Cursor -->
-    <IceCursor />
+    <!-- Reticle HUD Cursor -->
+    <CyberCursor />
 
-    <!-- Film grain overlay for premium texture -->
-    <div class="noise-overlay" />
+    <!-- Master Chained 3D Cyber Canvas (Continuous 3D Journey across all sections) -->
+    <GlobalCanvas v-if="store.mode === 'immersive'" />
 
-    <!-- 3D Background (Immersive mode only) -->
-    <IceCanvas />
-    <SnowParticles />
+    <!-- CRT Scanline Overlay -->
+    <div class="cyber-scanlines pointer-events-none" />
 
-    <!-- Navigation -->
+    <!-- Sci-Fi Terminal Boot-up Modal -->
+    <ModeModal />
+
+    <!-- Persistent HUD Navbar (Rule 1.1) -->
     <Navbar />
 
-    <!-- Main Content -->
+    <!-- Main Content Flow -->
     <main class="relative z-10">
-      <HeroSection />
+      <Transition name="mode-transition" mode="out-in">
+        <!-- MODE A: IMMERSIVE CYBERNETICS EXPERIENCE -->
+        <div v-if="store.mode === 'immersive'" key="mode-immersive" class="w-full">
+          <!-- 01. Hero (3D Gyroscope Mecha Core) -->
+          <CyberHeroSection />
 
-      <!-- Reveal divider -->
-      <div class="max-w-xl mx-auto reveal-divider">
-        <div
-          class="h-px w-full"
-          style="background: linear-gradient(to right, transparent, var(--accent-cyan), transparent); opacity: 0.3"
-        />
-      </div>
+          <!-- 02. About / Operator Dossier (3D Biometric Scanner) -->
+          <CyberAboutSection />
 
-      <AboutSection />
+          <!-- 03. Experience 3D Cylinder Carousel (Continuous Scroll-Driven Rotation + Tower Dive) -->
+          <CylinderExperienceSection />
 
-      <div class="max-w-xl mx-auto reveal-divider">
-        <div
-          class="h-px w-full"
-          style="background: linear-gradient(to right, transparent, var(--accent-cyan), transparent); opacity: 0.3"
-        />
-      </div>
+          <!-- 04. Technical Arsenal (3D Satellite Sphere Orbit) -->
+          <CyberSkillsSection />
 
-      <ExperienceSection />
+          <!-- 05. Research & Publications (3D Blueprint Prism) -->
+          <CyberResearchSection />
 
-      <div class="max-w-xl mx-auto reveal-divider">
-        <div
-          class="h-px w-full"
-          style="background: linear-gradient(to right, transparent, var(--accent-cyan), transparent); opacity: 0.3"
-        />
-      </div>
+          <!-- 06. Leadership & Cohort Missions -->
+          <CyberOrgsSection />
 
-      <SkillsSection />
+          <!-- 07. Direct Transmission Console -->
+          <CyberContactSection />
+        </div>
 
-      <div class="max-w-xl mx-auto reveal-divider">
-        <div
-          class="h-px w-full"
-          style="background: linear-gradient(to right, transparent, var(--accent-cyan), transparent); opacity: 0.3"
-        />
-      </div>
-
-      <ContactSection />
+        <!-- MODE B: TERMINAL LOG (CLEAN / PERFORMANCE / RECRUITER) -->
+        <div v-else key="mode-clean" class="w-full">
+          <TerminalLogView />
+        </div>
+      </Transition>
     </main>
   </div>
 </template>
+
+<style scoped>
+.mode-transition-enter-active,
+.mode-transition-leave-active {
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.mode-transition-enter-from {
+  opacity: 0;
+  transform: scale(0.98);
+}
+.mode-transition-leave-to {
+  opacity: 0;
+  transform: scale(1.02);
+}
+</style>

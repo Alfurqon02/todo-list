@@ -1,143 +1,129 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref } from 'vue'
 import { useExperienceStore } from '@/stores/experienceStore'
-import { navLinks } from '@/data/portfolioData'
-import { Sun, Moon, Snowflake, Zap, Menu, X } from 'lucide-vue-next'
+import { useCyberAudio } from '@/composables/useCyberAudio'
+import {
+  Globe2,
+  FileTerminal,
+  Volume2,
+  VolumeX,
+  Mail,
+  Layers,
+  Cpu,
+  BookOpen,
+  User,
+} from 'lucide-vue-next'
 
 const store = useExperienceStore()
-const scrolled = ref(false)
-const mobileOpen = ref(false)
+const audio = useCyberAudio()
 
-function handleScroll() {
-  scrolled.value = window.scrollY > 20
+function handleToggleMode() {
+  audio.playLockOn()
+  store.toggleMode()
 }
 
-onMounted(() => {
-  window.addEventListener('scroll', handleScroll, { passive: true })
-})
-
-onUnmounted(() => {
-  window.removeEventListener('scroll', handleScroll)
-})
-
-function scrollTo(href: string) {
-  mobileOpen.value = false
-  const el = document.querySelector(href)
-  if (el) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+function handleToggleSound() {
+  store.toggleSound()
+  if (store.soundEnabled) {
+    audio.playKeyBlip()
   }
 }
+
+function scrollTo(selector: string) {
+  audio.playTick()
+  const el = document.querySelector(selector)
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth' })
+  }
+}
+
+const navItems = [
+  { label: 'DOSSIER', href: '#about', icon: User },
+  { label: 'EXPERIENCE', href: '#experience', icon: Layers },
+  { label: 'ARSENAL', href: '#skills', icon: Cpu },
+  { label: 'RESEARCH', href: '#research', icon: BookOpen },
+  { label: 'TRANSMIT', href: '#contact', icon: Mail },
+]
 </script>
 
 <template>
   <nav
-    id="navbar"
-    class="fixed top-0 left-0 right-0 z-[100] transition-all duration-500"
-    :class="[
-      scrolled
-        ? 'py-3 glass-card !rounded-none border-x-0 border-t-0'
-        : 'py-5 bg-transparent',
-    ]"
+    class="fixed top-0 left-0 right-0 z-50 px-4 sm:px-8 py-3 bg-abyss/85 backdrop-blur-md border-b border-cyan-500/20"
   >
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between">
-      <!-- Logo -->
-      <a
-        href="#hero"
-        class="flex items-center gap-2.5 text-xl font-bold tracking-tight transition-transform hover:scale-105"
-        style="color: var(--accent-cyan)"
-        @click.prevent="scrollTo('#hero')"
-      >
-        <!-- <img src="/logo.svg" alt="Furqon Ice Monogram Logo" class="w-8 h-8" /> -->
-        <span>&lt;Furqon /&gt;</span>
-      </a>
-
-      <!-- Desktop Nav Links -->
-      <div class="hidden md:flex items-center gap-6">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <!-- Brand / Monogram -->
+      <div class="flex items-center gap-3">
         <a
-          v-for="link in navLinks"
-          :key="link.href"
-          :href="link.href"
-          class="text-sm font-medium transition-colors duration-200 hover:text-[var(--accent-cyan)]"
-          style="color: var(--text-secondary)"
-          @click.prevent="scrollTo(link.href)"
+          href="#"
+          class="flex items-center gap-2 font-mono text-sm font-bold tracking-wider text-white hover:text-neon-blue transition-colors"
+          @click.prevent="store.openBootModal()"
         >
-          {{ link.label }}
+          <span class="text-neon-blue">&lt;</span>
+          <span>FURQON_OS</span>
+          <span class="text-neon-blue">/&gt;</span>
         </a>
+
+        <div class="hidden lg:flex items-center gap-2 pl-3 border-l border-slate-800 text-[11px] font-mono text-slate-400">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span>CORE_STABLE</span>
+        </div>
       </div>
 
-      <!-- Controls -->
-      <div class="flex items-center gap-2">
-        <!-- Mode Toggle -->
+      <!-- Center Anchor Navigation Links (Mode A Immersive) -->
+      <div v-if="store.mode === 'immersive'" class="hidden md:flex items-center gap-1 font-mono text-xs">
         <button
-          id="btn-toggle-mode"
-          class="p-2 rounded-lg transition-all duration-300 hover:bg-[var(--card-bg)]"
-          :title="store.mode === 'immersive' ? 'Switch to Clean View' : 'Switch to Immersive 3D'"
-          @click="store.toggleMode()"
+          v-for="item in navItems"
+          :key="item.href"
+          type="button"
+          class="px-3 py-1 text-slate-400 hover:text-neon-blue hover:bg-cyan-950/40 rounded transition-colors flex items-center gap-1.5 cursor-pointer"
+          @click="scrollTo(item.href)"
         >
-          <Snowflake
-            v-if="store.mode === 'clean'"
-            :size="18"
-            style="color: var(--accent-cyan)"
-          />
-          <Zap
-            v-else
-            :size="18"
-            style="color: var(--accent-cyan)"
-          />
+          <component :is="item.icon" :size="12" />
+          <span>{{ item.label }}</span>
+        </button>
+      </div>
+
+      <!-- Actions & Mode Switcher (Rule 1.1) -->
+      <div class="flex items-center gap-3">
+        <!-- Audio SFX Toggle -->
+        <button
+          type="button"
+          class="p-2 text-slate-400 hover:text-neon-blue hover:bg-cyan-950/40 rounded transition-colors cursor-pointer"
+          :title="store.soundEnabled ? 'Audio SFX Enabled' : 'Audio SFX Muted'"
+          @click="handleToggleSound"
+        >
+          <Volume2 v-if="store.soundEnabled" :size="16" class="text-neon-blue" />
+          <VolumeX v-else :size="16" />
         </button>
 
-        <!-- Dark/Light Toggle -->
+        <!-- Mode Switcher Button (Rule 1.1 persistent toggle) -->
         <button
-          id="btn-toggle-dark"
-          class="p-2 rounded-lg transition-all duration-300 hover:bg-[var(--card-bg)]"
-          :title="store.isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
-          @click="store.toggleDark()"
+          type="button"
+          class="hud-btn text-xs py-1.5 px-3 cursor-pointer"
+          @click="handleToggleMode"
         >
-          <Moon v-if="!store.isDark" :size="18" style="color: var(--accent-cyan)" />
-          <Sun v-else :size="18" style="color: var(--accent-cyan)" />
+          <template v-if="store.mode === 'immersive'">
+            <FileTerminal :size="14" />
+            <span class="hidden sm:inline">TERMINAL LOG (CLEAN)</span>
+            <span class="sm:hidden">CLEAN</span>
+          </template>
+          <template v-else>
+            <Globe2 :size="14" />
+            <span class="hidden sm:inline">CYBER-CAROUSEL (3D)</span>
+            <span class="sm:hidden">3D CAROUSEL</span>
+          </template>
         </button>
 
-        <!-- Mobile Menu -->
+        <!-- Contact Direct -->
         <button
-          id="btn-mobile-menu"
-          class="md:hidden p-2 rounded-lg transition-all duration-300 hover:bg-[var(--card-bg)]"
-          @click="mobileOpen = !mobileOpen"
+          type="button"
+          class="hud-btn hud-btn-primary text-xs py-1.5 px-3 hidden sm:inline-flex cursor-pointer"
+          @click="scrollTo('#contact')"
         >
-          <X v-if="mobileOpen" :size="20" style="color: var(--text-primary)" />
-          <Menu v-else :size="20" style="color: var(--text-primary)" />
+          <Mail :size="14" />
+          <span>TRANSMIT</span>
         </button>
       </div>
     </div>
-
-    <!-- Mobile Dropdown -->
-    <Transition name="slide-down">
-      <div
-        v-if="mobileOpen"
-        class="md:hidden glass-card !rounded-t-none mt-1 mx-4 p-4 space-y-3"
-      >
-        <a
-          v-for="link in navLinks"
-          :key="link.href"
-          :href="link.href"
-          class="block text-sm font-medium py-2 px-3 rounded-lg transition-colors hover:bg-[var(--card-bg)]"
-          style="color: var(--text-secondary)"
-          @click.prevent="scrollTo(link.href)"
-        >
-          {{ link.label }}
-        </a>
-      </div>
-    </Transition>
   </nav>
 </template>
-
-<style scoped>
-.slide-down-enter-active,
-.slide-down-leave-active {
-  transition: all 0.3s ease;
-}
-.slide-down-enter-from,
-.slide-down-leave-to {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-</style>
