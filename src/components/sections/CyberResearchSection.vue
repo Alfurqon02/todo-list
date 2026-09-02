@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useCyberAudio } from '@/composables/useCyberAudio'
 import { useExperienceStore } from '@/stores/experienceStore'
+import { contentProgress, useJourneyStage } from '@/composables/useJourney'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import {
@@ -16,26 +17,12 @@ gsap.registerPlugin(ScrollTrigger)
 const audio = useCyberAudio()
 const store = useExperienceStore()
 const sectionRef = ref<HTMLElement | null>(null)
-const scrollProgress = ref(0)
 const activeIndex = ref(0)
 let scrollTriggerInstance: ScrollTrigger | null = null
 
-const stageOpacity = computed(() => {
-  const p = scrollProgress.value
-  if (p < 0.05) return Math.min(1, p / 0.05)
-  if (p > 0.92) return Math.max(0, 1 - (p - 0.92) / 0.08)
-  return 1.0
-})
-
-const stageScale = computed(() => {
-  const p = scrollProgress.value
-  if (p < 0.1) return 1.3 - 0.3 * (p / 0.1)
-  if (p > 0.88) {
-    const t = (p - 0.88) / 0.12
-    return 1.0 + 0.6 * (t * t)
-  }
-  return 1.0
-})
+// Copy is choreographed off the shared journey position, so the stage arrives
+// and departs in lockstep with the camera rather than on its own local curve.
+const { opacity: stageOpacity, scale: stageScale } = useJourneyStage(4)
 
 const researchProjects = [
   {
@@ -70,6 +57,7 @@ onMounted(async () => {
   await nextTick()
   if (sectionRef.value) {
     scrollTriggerInstance = ScrollTrigger.create({
+      id: 'journey-research',
       trigger: sectionRef.value,
       start: 'top top',
       end: '+=1400',
@@ -77,10 +65,10 @@ onMounted(async () => {
       anticipatePin: 1,
       scrub: 1.2,
       onUpdate: (self) => {
-        scrollProgress.value = self.progress
-        store.journeyProgress = 4.0 + self.progress * 1.0 // 4.0 -> 5.0
-
-        const calculatedIndex = self.progress > 0.5 ? 1 : 0
+        // The second publication used to appear at 50% and the section started
+        // fading at 58%, leaving it on screen for a sliver of the scroll.
+        const visible = contentProgress(4, self.progress)
+        const calculatedIndex = visible > 0.5 ? 1 : 0
         if (calculatedIndex !== activeIndex.value) {
           activeIndex.value = calculatedIndex
           store.activeResearchIndex = calculatedIndex
@@ -132,7 +120,7 @@ onBeforeUnmount(() => {
     >
       <!-- Left: Frame area for Master 3D Hologram Prism Canvas (5 cols) -->
       <div class="lg:col-span-5 flex items-center justify-center relative pointer-events-none">
-        <div class="w-full max-w-[340px] aspect-square relative flex items-center justify-center">
+        <div class="artifact-frame w-full max-w-[340px] aspect-square relative flex items-center justify-center">
           <div class="w-56 h-56 rounded-lg border border-cyan-500/25 animate-spin" style="animation-duration: 25s;" />
           <div class="w-64 h-64 rounded-full border border-dashed border-cyan-500/15 animate-spin" style="animation-duration: 35s; animation-direction: reverse;" />
 

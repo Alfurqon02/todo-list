@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mohammad Al Furqon | Cybernetics & Robotics Portfolio</title>
+    <title>Mohammad Al Furqon | Portfolio</title>
     <meta name="description" content="Portfolio of Mohammad Al Furqon - Fullstack Software Engineer & Robotics/Cybernetics Web Specialist featuring a 3D Cylinder Carousel interface.">
     <meta name="keywords" content="Mohammad Al Furqon, Software Engineer, Fullstack Developer, 3D WebGL, Cybernetics, Robotics, Vue 3, Three.js">
     <meta name="author" content="Mohammad Al Furqon">
@@ -15,8 +15,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  </head>
-  <body class="dark bg-abyss text-slate-200 antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
+    <script>
+    // Applied before first paint so a stored light theme does not flash dark.
+    try {
+      var t = JSON.parse(localStorage.getItem('portfolio-theme') || '"dark"');
+      document.documentElement.classList.toggle('dark', t !== 'light');
+    } catch (e) {}
+  </script>
+</head>
+  <body class="bg-abyss text-slate-200 antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

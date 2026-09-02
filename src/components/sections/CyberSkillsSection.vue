@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { skills } from '@/data/portfolioData'
 import { useCyberAudio } from '@/composables/useCyberAudio'
 import { useExperienceStore } from '@/stores/experienceStore'
+import { contentProgress, useJourneyStage } from '@/composables/useJourney'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import {
@@ -36,29 +37,16 @@ const categoryIcons: Record<string, any> = {
 }
 
 const activeCategory = computed(() => skills[activeCategoryIndex.value] || skills[0])
-const scrollProgress = ref(0)
 
-const stageOpacity = computed(() => {
-  const p = scrollProgress.value
-  if (p < 0.05) return Math.min(1, p / 0.05)
-  if (p > 0.92) return Math.max(0, 1 - (p - 0.92) / 0.08)
-  return 1.0
-})
-
-const stageScale = computed(() => {
-  const p = scrollProgress.value
-  if (p < 0.1) return 1.3 - 0.3 * (p / 0.1)
-  if (p > 0.88) {
-    const t = (p - 0.88) / 0.12
-    return 1.0 + 0.6 * (t * t)
-  }
-  return 1.0
-})
+// Copy is choreographed off the shared journey position, so the stage arrives
+// and departs in lockstep with the camera rather than on its own local curve.
+const { opacity: stageOpacity, scale: stageScale } = useJourneyStage(3)
 
 onMounted(async () => {
   await nextTick()
   if (sectionRef.value) {
     scrollTriggerInstance = ScrollTrigger.create({
+      id: 'journey-skills',
       trigger: sectionRef.value,
       start: 'top top',
       end: '+=1800',
@@ -66,11 +54,12 @@ onMounted(async () => {
       anticipatePin: 1,
       scrub: 1.2,
       onUpdate: (self) => {
-        scrollProgress.value = self.progress
-        store.journeyProgress = 3.0 + self.progress * 1.0 // 3.0 -> 4.0
+        // Same fix as the experience carousel: only the first four of six
+        // categories used to land before the section faded out.
+        const visible = contentProgress(3, self.progress)
         const calculatedIndex = Math.min(
           skills.length - 1,
-          Math.floor(self.progress * skills.length)
+          Math.floor(visible * skills.length)
         )
         if (calculatedIndex !== activeCategoryIndex.value) {
           activeCategoryIndex.value = calculatedIndex
@@ -137,7 +126,7 @@ function selectCategory(idx: number) {
     >
       <!-- Left: Frame area for Master 3D Holographic Sphere Canvas (5 cols) -->
       <div class="lg:col-span-5 flex items-center justify-center relative pointer-events-none">
-        <div class="w-full max-w-[360px] aspect-square relative flex items-center justify-center">
+        <div class="artifact-frame w-full max-w-[360px] aspect-square relative flex items-center justify-center">
           <div class="w-64 h-64 rounded-full border border-cyan-500/20 animate-spin" style="animation-duration: 30s;" />
           <div class="w-72 h-72 rounded-full border border-dashed border-cyan-500/15 animate-spin" style="animation-duration: 20s; animation-direction: reverse;" />
 
@@ -189,14 +178,11 @@ function selectCategory(idx: number) {
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
             <div
               v-for="item in activeCategory.items"
-              :key="item.name"
-              class="p-3 bg-slate-950/60 border border-cyan-500/20 rounded hover:border-neon-blue hover:bg-cyan-950/30 transition-all duration-200 group flex items-center justify-between"
+              :key="item"
+              class="p-3 bg-slate-950/60 border border-cyan-500/20 rounded hover:border-neon-blue hover:bg-cyan-950/30 transition-all duration-200 group flex items-center"
             >
               <span class="font-sans font-medium text-sm text-slate-200 group-hover:text-neon-blue transition-colors">
-                {{ item.name }}
-              </span>
-              <span class="text-[10px] font-mono text-cyan-400 px-1.5 py-0.5 bg-cyan-950/80 border border-cyan-500/30 rounded">
-                {{ item.level }}
+                {{ item }}
               </span>
             </div>
           </div>

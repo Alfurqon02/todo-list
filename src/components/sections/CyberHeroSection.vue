@@ -2,7 +2,7 @@
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { personalInfo, education, experiences } from '@/data/portfolioData'
 import { useCyberAudio } from '@/composables/useCyberAudio'
-import { useExperienceStore } from '@/stores/experienceStore'
+import { useJourneyStage } from '@/composables/useJourney'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import {
@@ -14,25 +14,24 @@ import {
 gsap.registerPlugin(ScrollTrigger)
 
 const audio = useCyberAudio()
-const store = useExperienceStore()
 const heroRef = ref<HTMLElement | null>(null)
-const heroProgress = ref(0)
 let scrollTriggerInstance: ScrollTrigger | null = null
+
+// Copy rides the same flight the camera is on: it holds while the camera is
+// parked, then rushes past the lens as the camera launches down the corridor.
+const { opacity: stageOpacity, transform: stageTransform } = useJourneyStage(0)
 
 onMounted(async () => {
   await nextTick()
   if (heroRef.value) {
     scrollTriggerInstance = ScrollTrigger.create({
+      id: 'journey-hero',
       trigger: heroRef.value,
       start: 'top top',
       end: '+=1200',
       pin: true,
       anticipatePin: 1,
       scrub: 1.0,
-      onUpdate: (self) => {
-        heroProgress.value = self.progress
-        store.journeyProgress = self.progress * 1.0 // 0.0 -> 1.0
-      },
     })
   }
 })
@@ -66,10 +65,7 @@ function scrollTo(selector: string) {
       <!-- Left Column: Typography & Action (7 cols) -->
       <div
         class="lg:col-span-7 transition-all duration-100 ease-out"
-        :style="{
-          opacity: Math.max(0, 1 - heroProgress * 1.5).toFixed(2),
-          transform: `translateY(${(-heroProgress * 50).toFixed(1)}px)`,
-        }"
+        :style="{ opacity: stageOpacity.toFixed(2), transform: stageTransform }"
       >
         <!-- Telemetry Status Tag -->
         <div class="inline-flex items-center gap-2 px-3 py-1 bg-cyan-950/60 border border-cyan-500/30 rounded-full font-mono text-xs text-neon-blue mb-6">
@@ -148,10 +144,10 @@ function scrollTo(selector: string) {
       <div
         class="lg:col-span-5 relative flex items-center justify-center pointer-events-none transition-all duration-100 ease-out"
         :style="{
-          opacity: Math.max(0, 1 - heroProgress * 1.5).toFixed(2),
+          opacity: stageOpacity.toFixed(2),
         }"
       >
-        <div class="w-full max-w-[420px] aspect-square relative flex items-center justify-center">
+        <div class="artifact-frame w-full max-w-[420px] aspect-square relative flex items-center justify-center">
           <!-- Orbiting Reticle Rings -->
           <div class="absolute inset-0 rounded-full border border-cyan-500/25 animate-spin" style="animation-duration: 35s;" />
           <div class="absolute inset-4 rounded-full border border-dashed border-cyan-500/20 animate-spin" style="animation-duration: 25s; animation-direction: reverse;" />

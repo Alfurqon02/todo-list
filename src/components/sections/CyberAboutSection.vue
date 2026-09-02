@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { personalInfo, education, languages } from '@/data/portfolioData'
-import { useExperienceStore } from '@/stores/experienceStore'
+import { useJourneyStage } from '@/composables/useJourney'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import {
@@ -18,46 +18,24 @@ import {
 
 gsap.registerPlugin(ScrollTrigger)
 
-const store = useExperienceStore()
 const sectionRef = ref<HTMLElement | null>(null)
-const aboutProgress = ref(0)
 let scrollTriggerInstance: ScrollTrigger | null = null
 
-// Smooth opacity curve for pinned section
-const contentOpacity = computed(() => {
-  const p = aboutProgress.value
-  if (p < 0.15) return Math.min(1, p / 0.15)
-  if (p > 0.7) return Math.max(0, 1 - (p - 0.7) / 0.3)
-  return 1.0
-})
-
-const contentTransform = computed(() => {
-  const p = aboutProgress.value
-  if (p < 0.15) {
-    const t = 1 - p / 0.15
-    return `translateY(${t * 30}px)`
-  }
-  if (p > 0.7) {
-    const t = (p - 0.7) / 0.3
-    return `translateY(${-t * 30}px)`
-  }
-  return 'translateY(0px)'
-})
+// Copy is choreographed off the shared journey position, so it arrives and
+// departs in lockstep with the camera rather than on its own local curve.
+const { opacity: contentOpacity, transform: contentTransform } = useJourneyStage(1)
 
 onMounted(async () => {
   await nextTick()
   if (sectionRef.value) {
     scrollTriggerInstance = ScrollTrigger.create({
+      id: 'journey-about',
       trigger: sectionRef.value,
       start: 'top top',
       end: '+=1400',
       pin: true,
       anticipatePin: 1,
       scrub: 1.0,
-      onUpdate: (self) => {
-        aboutProgress.value = self.progress
-        store.journeyProgress = 1.0 + self.progress * 1.0 // 1.0 -> 2.0
-      },
     })
   }
 })
@@ -178,7 +156,7 @@ const competencies = [
 
       <!-- Right Column: Unobstructed 3D Biometric Scanner Core HUD Frame (5 cols) -->
       <div class="lg:col-span-5 relative flex items-center justify-center pointer-events-none">
-        <div class="w-full max-w-[420px] aspect-square relative flex items-center justify-center">
+        <div class="artifact-frame w-full max-w-[420px] aspect-square relative flex items-center justify-center">
           <!-- Outer Scanning Ring -->
           <div class="absolute inset-0 rounded-full border border-cyan-500/25 animate-spin" style="animation-duration: 25s;" />
           <div class="absolute inset-4 rounded-full border border-dashed border-cyan-500/20 animate-spin" style="animation-duration: 18s; animation-direction: reverse;" />

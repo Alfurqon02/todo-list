@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
-import { useDark, useToggle, usePreferredReducedMotion, useStorage } from '@vueuse/core'
+import { computed, ref, watch, watchEffect } from 'vue'
+import { usePreferredReducedMotion, useStorage } from '@vueuse/core'
 
 export type ExperienceMode = 'immersive' | 'clean'
 
@@ -8,20 +8,40 @@ export const useExperienceStore = defineStore('experience', () => {
   // ==========================================
   // DARK THEME (Always dark for Cybernetics theme)
   // ==========================================
-  const isDark = useDark({
-    selector: 'body',
-    attribute: 'class',
-    valueDark: 'dark',
-    valueLight: '',
-  })
-  isDark.value = true
-  const toggleDark = useToggle(isDark)
+  // Dark is the default and what the palette is designed around, but light is
+  // a real alternative rather than a forced value.
+  //
+  // Stored explicitly rather than through useDark(): that helper writes "auto"
+  // whenever the chosen theme happens to match the OS preference, so a visitor
+  // on a dark OS who picks light would silently get dark back on reload.
+  const theme = useStorage<'dark' | 'light'>('portfolio-theme', 'dark')
+  const isDark = computed(() => theme.value === 'dark')
 
-  // ==========================================
-  // ONBOARDING BOOT MODAL
-  // ==========================================
-  const modalDismissed = useStorage<boolean>('portfolio-boot-dismissed', false)
-  const showModeModal = ref(!modalDismissed.value)
+  function toggleDark() {
+    theme.value = theme.value === 'dark' ? 'light' : 'dark'
+  }
+
+  watchEffect(() => {
+    if (typeof document === 'undefined') return
+    const root = document.documentElement
+
+    // `theme-switching` kills transitions for the duration of the swap, and
+    // reading offsetHeight forces the style pass to happen inside that window.
+    //
+    // The forced pass is not decorative. Swapping the palette variables alone
+    // leaves elements that were already on the page painted with their old
+    // resolved colours — the variables read correctly on those elements, but
+    // the properties consuming them are not re-resolved. Freshly created
+    // elements pick up the new theme fine, which is what makes it look like
+    // only part of the page responds. Verified on a production build: without
+    // this the cards, HUD buttons and telemetry tags stay dark in light mode.
+    root.classList.add('theme-switching')
+    // On <html> rather than <body> so the :root-level palette aliases in
+    // main.css resolve against the active theme.
+    root.classList.toggle('dark', theme.value === 'dark')
+    void root.offsetHeight
+    root.classList.remove('theme-switching')
+  })
 
   // ==========================================
   // EXPERIENCE MODE (Cyber-Carousel vs Terminal Log)
@@ -29,11 +49,19 @@ export const useExperienceStore = defineStore('experience', () => {
   const storedMode = useStorage<ExperienceMode>('portfolio-mode', 'immersive')
   const mode = ref<ExperienceMode>(storedMode.value)
 
-  // Rule 1.2: Reduced motion -> default to clean mode
+  // ==========================================
+  // 3D FLIGHT TOGGLE (navbar switch)
+  //
+  // Turning this off unmounts the WebGL corridor and collapses the scroll
+  // choreography to plain static content, without swapping the whole layout
+  // the way the Terminal Log mode does.
+  // ==========================================
+  const animationsEnabled = useStorage<boolean>('portfolio-animations', true)
+
+  // Rule 1.2: reduced motion -> land on the immersive layout with the flight off
   const reducedMotion = usePreferredReducedMotion()
   if (reducedMotion.value === 'reduce') {
-    mode.value = 'clean'
-    storedMode.value = 'clean'
+    animationsEnabled.value = false
   }
 
   // Audio SFX state
@@ -62,9 +90,7 @@ export const useExperienceStore = defineStore('experience', () => {
     mode.value = newMode
     if (remember) {
       storedMode.value = newMode
-      modalDismissed.value = true
     }
-    showModeModal.value = false
   }
 
   function toggleMode() {
@@ -75,13 +101,8 @@ export const useExperienceStore = defineStore('experience', () => {
     soundEnabled.value = !soundEnabled.value
   }
 
-  function openBootModal() {
-    showModeModal.value = true
-  }
-
-  function closeBootModal() {
-    showModeModal.value = false
-    modalDismissed.value = true
+  function toggleAnimations() {
+    animationsEnabled.value = !animationsEnabled.value
   }
 
   // ==========================================
@@ -146,14 +167,14 @@ export const useExperienceStore = defineStore('experience', () => {
   }
 
   return {
+    theme,
     isDark,
     toggleDark,
     mode,
     setMode,
     toggleMode,
-    showModeModal,
-    openBootModal,
-    closeBootModal,
+    animationsEnabled,
+    toggleAnimations,
     soundEnabled,
     toggleSound,
     activeNodeIndex,

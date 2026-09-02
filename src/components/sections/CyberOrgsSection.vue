@@ -37,6 +37,7 @@ onMounted(async () => {
   await nextTick()
   if (sectionRef.value) {
     scrollTriggerInstance = ScrollTrigger.create({
+      id: 'journey-orgs',
       trigger: sectionRef.value,
       start: 'top 85%',
       end: 'bottom top',
@@ -60,7 +61,7 @@ onBeforeUnmount(() => {
   <section
     ref="sectionRef"
     id="community"
-    class="relative py-24 px-4 sm:px-8 md:px-16 bg-abyss border-t border-cyan-500/15 overflow-hidden"
+    class="relative py-24 px-4 sm:px-8 md:px-16 bg-transparent border-t border-cyan-500/15 overflow-hidden"
   >
     <div
       class="max-w-6xl mx-auto transition-transform duration-100 ease-out"
@@ -113,14 +114,6 @@ onBeforeUnmount(() => {
             </p>
           </div>
 
-          <!-- Highlight Achievement -->
-          <div
-            v-if="org.highlight"
-            class="pt-3 border-t border-cyan-500/15 flex items-center gap-2 text-xs font-mono text-cyan-300"
-          >
-            <Sparkles :size="14" class="text-neon-blue flex-shrink-0" />
-            <span class="truncate">{{ org.highlight }}</span>
-          </div>
         </div>
       </div>
     </div>

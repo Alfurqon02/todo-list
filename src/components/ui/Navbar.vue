@@ -12,6 +12,10 @@ import {
   Cpu,
   BookOpen,
   User,
+  Orbit,
+  Square,
+  Sun,
+  Moon,
 } from 'lucide-vue-next'
 
 const store = useExperienceStore()
@@ -20,6 +24,16 @@ const audio = useCyberAudio()
 function handleToggleMode() {
   audio.playLockOn()
   store.toggleMode()
+}
+
+function handleToggleTheme() {
+  audio.playTick()
+  store.toggleDark()
+}
+
+function handleToggleAnimations() {
+  audio.playLockOn()
+  store.toggleAnimations()
 }
 
 function handleToggleSound() {
@@ -56,10 +70,10 @@ const navItems = [
         <a
           href="#"
           class="flex items-center gap-2 font-mono text-sm font-bold tracking-wider text-white hover:text-neon-blue transition-colors"
-          @click.prevent="store.openBootModal()"
+          @click.prevent="scrollTo('#hero')"
         >
           <span class="text-neon-blue">&lt;</span>
-          <span>FURQON_OS</span>
+          <span>FURQON</span>
           <span class="text-neon-blue">/&gt;</span>
         </a>
 
@@ -85,6 +99,35 @@ const navItems = [
 
       <!-- Actions & Mode Switcher (Rule 1.1) -->
       <div class="flex items-center gap-3">
+        <!-- 3D Flight Toggle -->
+        <button
+          v-if="store.mode === 'immersive'"
+          type="button"
+          class="flex items-center gap-1.5 px-2.5 py-1.5 rounded font-mono text-[11px] tracking-wider border transition-colors cursor-pointer"
+          :class="store.animationsEnabled
+            ? 'text-neon-blue border-cyan-500/40 bg-cyan-950/40 hover:bg-cyan-900/40'
+            : 'text-slate-500 border-slate-700 hover:text-slate-300 hover:border-slate-500'"
+          :aria-pressed="store.animationsEnabled"
+          :title="store.animationsEnabled ? 'Disable 3D flight and scroll motion' : 'Enable 3D flight and scroll motion'"
+          @click="handleToggleAnimations"
+        >
+          <Orbit v-if="store.animationsEnabled" :size="14" class="animate-spin-slow" />
+          <Square v-else :size="14" />
+          <span class="hidden sm:inline">3D {{ store.animationsEnabled ? 'ON' : 'OFF' }}</span>
+        </button>
+
+        <!-- Light / Dark Theme -->
+        <button
+          type="button"
+          class="p-2 text-slate-400 hover:text-neon-blue hover:bg-cyan-950/40 rounded transition-colors cursor-pointer"
+          :title="store.isDark ? 'Switch to light theme' : 'Switch to dark theme'"
+          :aria-pressed="!store.isDark"
+          @click="handleToggleTheme"
+        >
+          <Sun v-if="store.isDark" :size="16" />
+          <Moon v-else :size="16" />
+        </button>
+
         <!-- Audio SFX Toggle -->
         <button
           type="button"

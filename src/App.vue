@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { useExperienceStore } from '@/stores/experienceStore'
 import { useSmoothScroll } from '@/composables/useSmoothScroll'
+import { useJourneyDriver } from '@/composables/useJourney'
 import LoadingScreen from '@/components/ui/LoadingScreen.vue'
 import Navbar from '@/components/ui/Navbar.vue'
 import CyberCursor from '@/components/ui/CyberCursor.vue'
-import ModeModal from '@/components/ui/ModeModal.vue'
 import GlobalCanvas from '@/components/3d/GlobalCanvas.vue'
 
 // Immersive Cyber Sections (Mode A)
@@ -23,6 +23,11 @@ const store = useExperienceStore()
 
 // Initialize Lenis continuous smooth scrolling synchronized with GSAP ScrollTrigger
 useSmoothScroll()
+
+// Publish the continuous journey position. Deliberately outside GlobalCanvas:
+// the section copy is choreographed off the same value, so it has to keep
+// flowing even when the 3D flight is switched off from the navbar.
+useJourneyDriver()
 </script>
 
 <template>
@@ -33,14 +38,11 @@ useSmoothScroll()
     <!-- Reticle HUD Cursor -->
     <CyberCursor />
 
-    <!-- Master Chained 3D Cyber Canvas (Continuous 3D Journey across all sections) -->
-    <GlobalCanvas v-if="store.mode === 'immersive'" />
+    <!-- Master 3D corridor: one continuous camera flight past every artifact -->
+    <GlobalCanvas v-if="store.mode === 'immersive' && store.animationsEnabled" />
 
     <!-- CRT Scanline Overlay -->
     <div class="cyber-scanlines pointer-events-none" />
-
-    <!-- Sci-Fi Terminal Boot-up Modal -->
-    <ModeModal />
 
     <!-- Persistent HUD Navbar (Rule 1.1) -->
     <Navbar />

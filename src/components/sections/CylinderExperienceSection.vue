@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { experiences, type Experience } from '@/data/portfolioData'
 import { useCyberAudio } from '@/composables/useCyberAudio'
 import { useExperienceStore } from '@/stores/experienceStore'
+import { contentProgress, useJourneyStage } from '@/composables/useJourney'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import {
@@ -39,24 +40,9 @@ function updateRadius() {
   else radius.value = 620
 }
 
-const scrollProgress = ref(0)
-
-const stageOpacity = computed(() => {
-  const p = scrollProgress.value
-  if (p < 0.05) return Math.min(1, p / 0.05)
-  if (p > 0.92) return Math.max(0, 1 - (p - 0.92) / 0.08)
-  return 1.0
-})
-
-const stageScale = computed(() => {
-  const p = scrollProgress.value
-  if (p < 0.1) return 1.3 - 0.3 * (p / 0.1)
-  if (p > 0.88) {
-    const t = (p - 0.88) / 0.12
-    return 1.0 + 0.6 * (t * t)
-  }
-  return 1.0
-})
+// Copy is choreographed off the shared journey position, so the stage arrives
+// and departs in lockstep with the camera rather than on its own local curve.
+const { opacity: stageOpacity, scale: stageScale } = useJourneyStage(2)
 
 // Compute 3D cylinder transform for each card (Rule 4.2)
 function getTransform(index: number) {
@@ -91,6 +77,7 @@ onMounted(async () => {
     const totalRotationAngle = (totalCount - 1) * step
 
     scrollTriggerInstance = ScrollTrigger.create({
+      id: 'journey-experience',
       trigger: sectionRef.value,
       start: 'top top',
       end: '+=2400',
@@ -98,17 +85,23 @@ onMounted(async () => {
       anticipatePin: 1,
       scrub: 1.2,
       onUpdate: (self) => {
-        scrollProgress.value = self.progress
-        currentAngle.value = -self.progress * totalRotationAngle
+        // The carousel has to complete inside the window where this section is
+        // still on screen. Spreading it over the section's whole scroll meant
+        // the last roles rotated past after the copy had already faded out —
+        // you never got past role 8 or 9 of 11.
+        const visible = contentProgress(2, self.progress)
+        currentAngle.value = -visible * totalRotationAngle
         store.carouselRotation = currentAngle.value
-        store.journeyProgress = 2.0 + self.progress * 1.0 // 2.0 -> 3.0
 
+        // round(), not floor(+0.3): the front card is at visible * (n - 1), and
+        // the old bias drifted a whole card out of step past role 7.
         const calculatedIndex = Math.min(
           totalCount - 1,
-          Math.floor(self.progress * totalCount + 0.3)
+          Math.round(visible * (totalCount - 1))
         )
         if (calculatedIndex !== activeIndex.value) {
           activeIndex.value = calculatedIndex
+          store.activeNodeIndex = calculatedIndex
           audio.playTick()
         }
       },
@@ -204,10 +197,10 @@ function closeInspector() {
         >
           <div class="flex items-center justify-between border-b border-cyan-500/20 pb-3 mb-3">
             <span class="telemetry-tag text-[10px]">
-              NODE_{{ String(index + 1).padStart(2, '0') }} // {{ item.period }}
+              NODE_{{ String(index + 1).padStart(2, '0') }}
             </span>
             <span class="text-xs font-mono text-neon-blue font-bold">
-              {{ item.location }}
+              {{ item.period }}
             </span>
           </div>
 
@@ -219,7 +212,7 @@ function closeInspector() {
           </p>
 
           <p class="text-xs text-slate-300 line-clamp-2 leading-relaxed mb-4 font-sans">
-            {{ item.description }}
+            {{ item.highlights[0] }}
           </p>
 
           <div class="flex items-center justify-between pt-3 border-t border-cyan-500/20">
@@ -284,12 +277,8 @@ function closeInspector() {
           <h3 class="text-2xl font-bold font-rajdhani text-white mb-1">
             {{ activeInspectorNode.role }}
           </h3>
-          <p class="text-sm font-mono text-neon-blue mb-4">
-            {{ activeInspectorNode.company }} • {{ activeInspectorNode.location }} ({{ activeInspectorNode.period }})
-          </p>
-
-          <p class="text-sm text-slate-300 leading-relaxed mb-6 font-sans">
-            {{ activeInspectorNode.description }}
+          <p class="text-sm font-mono text-neon-blue mb-6">
+            {{ activeInspectorNode.company }} ({{ activeInspectorNode.period }})
           </p>
 
           <div class="mb-6 space-y-2">

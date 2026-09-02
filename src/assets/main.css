@@ -3,21 +3,117 @@
 @tailwind utilities;
 
 /* ============================================
-   CYBERNETICS & ROBOTICS PALETTE (rules.md)
+   THEME PALETTE
+   ============================================
+
+   Every colour the templates use resolves through one of these variables, as
+   a bare "R G B" triplet so Tailwind's alpha modifiers (bg-slate-900/50) still
+   work. Dark is the default; the light theme redefines the same names.
+
+   The ramps are semantic, not literal: in the light theme slate-900 is a near
+   white card and slate-200 is near-black body text. That is deliberate — the
+   templates are written dark-first, and flipping the ramp here re-themes all
+   of them without touching a single class name.
    ============================================ */
 
 :root {
-  --bg-abyss: #030712;
-  --bg-cyber: #0a0f1d;
-  --bg-cyber-surface: rgba(10, 15, 29, 0.75);
-  --text-main: #e2e8f0;
-  --text-muted: #64748b;
-  --neon-blue: #00f3ff;
-  --electric-blue: #0096ff;
-  --hud-border: rgba(0, 243, 255, 0.3);
-  --hud-bg: rgba(3, 7, 18, 0.85);
-  --neon-glow: 0 0 10px rgba(0, 243, 255, 0.5), 0 0 20px rgba(0, 243, 255, 0.25);
-  --neon-glow-strong: 0 0 15px rgba(0, 243, 255, 0.8), 0 0 35px rgba(0, 150, 255, 0.5);
+  /* surfaces, darkest to lightest in the dark theme */
+  --c-abyss: 3 7 18;
+  --c-cyber: 10 15 29;
+  --c-cyber-light: 17 24 39;
+  --c-slate-950: 2 6 23;
+  --c-slate-900: 15 23 42;
+  --c-slate-800: 30 41 59;
+  --c-slate-700: 51 65 85;
+  /* type, muted to loudest */
+  --c-slate-500: 100 116 139;
+  --c-slate-400: 148 163 184;
+  --c-slate-300: 203 213 225;
+  --c-slate-200: 226 232 240;
+  --c-heading: 255 255 255;
+  /* accent */
+  --c-neon: 0 243 255;
+  --c-electric: 0 150 255;
+  --c-cyan-200: 165 243 252;
+  --c-cyan-300: 103 232 249;
+  --c-cyan-400: 34 211 238;
+  --c-cyan-500: 6 182 212;
+  --c-cyan-600: 8 145 178;
+  --c-cyan-900: 22 78 99;
+  --c-cyan-950: 8 51 68;
+  --c-emerald: 52 211 153;
+  --c-blue-500: 59 130 246;
+  /* text that sits on top of a filled accent */
+  --c-on-accent: 255 255 255;
+
+  --glow-a: 0 243 255;
+  --glow-strength: 1;
+  --hud-bg-alpha: 0.85;
+  --grid-alpha: 0.04;
+  --scanline-alpha: 0.25;
+}
+
+/*
+ * LIGHT THEME.
+ *
+ * The theme class sits on <html>, not <body>, and that matters: the semantic
+ * aliases below (--neon-blue, --hud-bg, ...) are declared at :root, and a
+ * declaration on html cannot see custom properties overridden on body. Putting
+ * both on the same element keeps every alias resolving against the live theme.
+ *
+ * The slate ramp is inverted and the cyans are pulled down to hold contrast
+ * against a pale background — neon cyan on white is unreadable.
+ */
+:root:not(.dark) {
+  --c-abyss: 244 247 251;
+  --c-cyber: 234 240 247;
+  --c-cyber-light: 223 231 241;
+  --c-slate-950: 255 255 255;
+  --c-slate-900: 255 255 255;
+  --c-slate-800: 214 223 234;
+  --c-slate-700: 186 198 213;
+
+  --c-slate-500: 100 116 139;
+  --c-slate-400: 71 85 105;
+  --c-slate-300: 51 65 85;
+  --c-slate-200: 30 41 59;
+  --c-heading: 12 20 34;
+
+  --c-neon: 4 100 138;
+  --c-electric: 6 90 160;
+  --c-cyan-200: 12 74 110;
+  --c-cyan-300: 14 116 144;
+  --c-cyan-400: 8 126 154;
+  --c-cyan-500: 20 130 158;
+  --c-cyan-600: 12 110 136;
+  --c-cyan-900: 205 236 245;
+  --c-cyan-950: 226 244 250;
+  --c-emerald: 4 120 87;
+  --c-blue-500: 29 78 216;
+  --c-on-accent: 255 255 255;
+
+  --glow-a: 6 120 150;
+  --glow-strength: 0.35;
+  --hud-bg-alpha: 0.9;
+  --grid-alpha: 0.07;
+  --scanline-alpha: 0.05;
+}
+
+/* ============================================
+   CYBERNETICS & ROBOTICS PALETTE (rules.md)
+   ============================================ */
+:root {
+  --bg-abyss: rgb(var(--c-abyss));
+  --bg-cyber: rgb(var(--c-cyber));
+  --bg-cyber-surface: rgb(var(--c-cyber) / 0.75);
+  --text-main: rgb(var(--c-slate-200));
+  --text-muted: rgb(var(--c-slate-500));
+  --neon-blue: rgb(var(--c-neon));
+  --electric-blue: rgb(var(--c-electric));
+  --hud-border: rgb(var(--c-cyan-500) / 0.35);
+  --hud-bg: rgb(var(--c-slate-950) / var(--hud-bg-alpha));
+  --neon-glow: 0 0 10px rgb(var(--glow-a) / calc(0.5 * var(--glow-strength))), 0 0 20px rgb(var(--glow-a) / calc(0.25 * var(--glow-strength)));
+  --neon-glow-strong: 0 0 15px rgb(var(--glow-a) / calc(0.8 * var(--glow-strength))), 0 0 35px rgb(var(--glow-a) / calc(0.5 * var(--glow-strength)));
 
   /* Compatibility bindings */
   --bg-primary: var(--bg-abyss);
@@ -30,15 +126,13 @@
   --card-border: var(--hud-border);
 }
 
-.dark {
-  --bg-abyss: #030712;
-  --bg-cyber: #0a0f1d;
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --neon-blue: #00f3ff;
-  --electric-blue: #0096ff;
-  --hud-border: rgba(0, 243, 255, 0.35);
-  --hud-bg: rgba(3, 7, 18, 0.85);
+/* The palette above already carries both themes; nothing extra needed here. */
+
+/* Held only for the frame in which the theme swaps; see the store. */
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition: none !important;
 }
 
 /* ============================================
@@ -72,17 +166,17 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #030712;
+  background: rgb(var(--c-abyss));
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 243, 255, 0.4);
+  background: rgb(var(--c-neon) / 0.4);
   border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #00f3ff;
-  box-shadow: 0 0 10px #00f3ff;
+  background: rgb(var(--c-neon));
+  box-shadow: 0 0 10px rgb(var(--glow-a) / var(--glow-strength));
 }
 
 /* ============================================
@@ -151,7 +245,7 @@ body {
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    background: rgba(0, 243, 255, 0.06);
+    background: rgb(var(--c-neon) / 0.08);
     border: 1px solid var(--hud-border);
     color: var(--neon-blue);
     clip-path: polygon(
@@ -167,38 +261,38 @@ body {
   }
 
   .hud-btn:hover {
-    background: rgba(0, 243, 255, 0.18);
+    background: rgb(var(--c-neon) / 0.9);
     border-color: var(--neon-blue);
-    color: #ffffff;
-    box-shadow: 0 0 15px rgba(0, 243, 255, 0.5);
+    color: rgb(var(--c-on-accent));
+    box-shadow: 0 0 15px rgb(var(--glow-a) / calc(0.5 * var(--glow-strength)));
     transform: translateY(-1px);
   }
 
   .hud-btn-primary {
-    background: linear-gradient(135deg, rgba(0, 243, 255, 0.3), rgba(0, 150, 255, 0.2));
+    background: linear-gradient(135deg, rgb(var(--c-neon) / 0.85), rgb(var(--c-electric) / 0.85));
     border-color: var(--neon-blue);
-    color: #ffffff;
-    box-shadow: 0 0 15px rgba(0, 243, 255, 0.35);
+    color: rgb(var(--c-on-accent));
+    box-shadow: 0 0 15px rgb(var(--glow-a) / calc(0.35 * var(--glow-strength)));
   }
 
   .hud-btn-primary:hover {
-    background: linear-gradient(135deg, rgba(0, 243, 255, 0.5), rgba(0, 150, 255, 0.4));
-    box-shadow: 0 0 25px rgba(0, 243, 255, 0.7);
+    background: linear-gradient(135deg, rgb(var(--c-neon)), rgb(var(--c-electric)));
+    box-shadow: 0 0 25px rgb(var(--glow-a) / calc(0.7 * var(--glow-strength)));
   }
 
   /* Neon Text Utilities */
   .text-neon {
     color: var(--neon-blue);
-    text-shadow: 0 0 10px rgba(0, 243, 255, 0.6), 0 0 20px rgba(0, 243, 255, 0.3);
+    text-shadow: 0 0 10px rgb(var(--glow-a) / calc(0.6 * var(--glow-strength))), 0 0 20px rgb(var(--glow-a) / calc(0.3 * var(--glow-strength)));
   }
 
   .text-electric {
     color: var(--electric-blue);
-    text-shadow: 0 0 10px rgba(0, 150, 255, 0.6);
+    text-shadow: 0 0 10px rgb(var(--glow-a) / calc(0.6 * var(--glow-strength)));
   }
 
   .text-gradient {
-    background: linear-gradient(135deg, #00f3ff 0%, #0096ff 50%, #e2e8f0 100%);
+    background: linear-gradient(135deg, rgb(var(--c-neon)) 0%, rgb(var(--c-electric)) 50%, rgb(var(--c-heading)) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -212,8 +306,8 @@ body {
 /* High-tech hex grid overlay */
 .cyber-grid-bg {
   background-image: 
-    linear-gradient(to right, rgba(0, 243, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0, 243, 255, 0.04) 1px, transparent 1px);
+    linear-gradient(to right, rgb(var(--c-cyan-500) / var(--grid-alpha)) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(var(--c-cyan-500) / var(--grid-alpha)) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
@@ -225,7 +319,7 @@ body {
   z-index: 90;
   background: linear-gradient(
     rgba(18, 16, 16, 0) 50%, 
-    rgba(0, 0, 0, 0.25) 50%
+    rgb(0 0 0 / var(--scanline-alpha)) 50%
   ), linear-gradient(
     90deg,
     rgba(255, 0, 0, 0.01),
@@ -249,8 +343,8 @@ body {
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, #00f3ff, transparent);
-  box-shadow: 0 0 12px #00f3ff, 0 0 20px #00f3ff;
+  background: linear-gradient(90deg, transparent, rgb(var(--c-neon)), transparent);
+  box-shadow: 0 0 12px rgb(var(--glow-a) / var(--glow-strength)), 0 0 20px rgb(var(--glow-a) / var(--glow-strength));
   animation: laserSweep 5s ease-in-out infinite;
   pointer-events: none;
   z-index: 15;
@@ -286,7 +380,7 @@ body {
   left: -50%;
   width: 200%;
   height: 200%;
-  background: conic-gradient(from 0deg, transparent 0deg, transparent 300deg, rgba(0, 243, 255, 0.15) 360deg);
+  background: conic-gradient(from 0deg, transparent 0deg, transparent 300deg, rgb(var(--c-neon) / 0.15) 360deg);
   animation: radarRotate 6s linear infinite;
   pointer-events: none;
   z-index: 1;

@@ -8,14 +8,40 @@ export default {
   theme: {
     extend: {
       colors: {
-        abyss: '#030712',
-        cyber: '#0a0f1d',
-        'cyber-light': '#111827',
-        'neon-blue': '#00f3ff',
-        'electric-blue': '#0096ff',
-        'cyber-glow': 'rgba(0, 243, 255, 0.5)',
-        'hud-border': 'rgba(0, 243, 255, 0.3)',
-        'hud-bg': 'rgba(3, 7, 18, 0.75)',
+        // Bound to the CSS palette in main.css so both themes flow through the
+        // same class names. The <alpha-value> placeholder keeps modifiers such
+        // as bg-slate-900/50 working.
+        abyss: 'rgb(var(--c-abyss) / <alpha-value>)',
+        cyber: 'rgb(var(--c-cyber) / <alpha-value>)',
+        'cyber-light': 'rgb(var(--c-cyber-light) / <alpha-value>)',
+        'neon-blue': 'rgb(var(--c-neon) / <alpha-value>)',
+        'electric-blue': 'rgb(var(--c-electric) / <alpha-value>)',
+        white: 'rgb(var(--c-heading) / <alpha-value>)',
+        slate: {
+          200: 'rgb(var(--c-slate-200) / <alpha-value>)',
+          300: 'rgb(var(--c-slate-300) / <alpha-value>)',
+          400: 'rgb(var(--c-slate-400) / <alpha-value>)',
+          500: 'rgb(var(--c-slate-500) / <alpha-value>)',
+          600: 'rgb(var(--c-slate-500) / <alpha-value>)',
+          700: 'rgb(var(--c-slate-700) / <alpha-value>)',
+          800: 'rgb(var(--c-slate-800) / <alpha-value>)',
+          900: 'rgb(var(--c-slate-900) / <alpha-value>)',
+          950: 'rgb(var(--c-slate-950) / <alpha-value>)',
+        },
+        cyan: {
+          200: 'rgb(var(--c-cyan-200) / <alpha-value>)',
+          300: 'rgb(var(--c-cyan-300) / <alpha-value>)',
+          400: 'rgb(var(--c-cyan-400) / <alpha-value>)',
+          500: 'rgb(var(--c-cyan-500) / <alpha-value>)',
+          600: 'rgb(var(--c-cyan-600) / <alpha-value>)',
+          900: 'rgb(var(--c-cyan-900) / <alpha-value>)',
+          950: 'rgb(var(--c-cyan-950) / <alpha-value>)',
+        },
+        emerald: { 400: 'rgb(var(--c-emerald) / <alpha-value>)' },
+        blue: { 500: 'rgb(var(--c-blue-500) / <alpha-value>)' },
+        'cyber-glow': 'rgb(var(--c-neon) / 0.5)',
+        'hud-border': 'rgb(var(--c-cyan-500) / 0.3)',
+        'hud-bg': 'rgb(var(--c-slate-950) / 0.75)',
         glacier: {
           50: '#f4f9fd',
           100: '#eaf2f8',
@@ -45,6 +71,7 @@ export default {
         'glitch': 'glitch 1s infinite',
         'fade-in-up': 'fadeInUp 0.5s ease-out forwards',
         'fade-in': 'fadeIn 0.3s ease-out forwards',
+        'spin-slow': 'spin 6s linear infinite',
       },
       keyframes: {
         pulseNeon: {
