@@ -147,13 +147,13 @@ const navItems = [
         >
           <template v-if="store.mode === 'immersive'">
             <FileTerminal :size="14" />
-            <span class="hidden sm:inline">TERMINAL LOG (CLEAN)</span>
+            <span class="hidden sm:inline">CLEAN</span>
             <span class="sm:hidden">CLEAN</span>
           </template>
           <template v-else>
             <Globe2 :size="14" />
-            <span class="hidden sm:inline">CYBER-CAROUSEL (3D)</span>
-            <span class="sm:hidden">3D CAROUSEL</span>
+            <span class="hidden sm:inline">ANIMATION</span>
+            <span class="sm:hidden">ANIMATION</span>
           </template>
         </button>
 

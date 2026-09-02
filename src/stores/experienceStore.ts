@@ -46,8 +46,32 @@ export const useExperienceStore = defineStore('experience', () => {
   // ==========================================
   // EXPERIENCE MODE (Cyber-Carousel vs Terminal Log)
   // ==========================================
+  // If URL has #clean (or #terminal), automatically show clean mode; otherwise default to normal (immersive).
+  function getModeFromHash(): ExperienceMode | null {
+    if (typeof window === 'undefined') return null
+    const hash = window.location.hash.toLowerCase()
+    if (hash === '#clean' || hash === '#terminal') {
+      return 'clean'
+    }
+    return null
+  }
+
+  const initialHashMode = getModeFromHash()
   const storedMode = useStorage<ExperienceMode>('portfolio-mode', 'immersive')
-  const mode = ref<ExperienceMode>(storedMode.value)
+  // Use hash if present, otherwise storedMode (or default 'immersive')
+  const mode = ref<ExperienceMode>(initialHashMode ?? storedMode.value)
+
+  // Listen to hash changes in browser
+  if (typeof window !== 'undefined') {
+    window.addEventListener('hashchange', () => {
+      const hashMode = getModeFromHash()
+      if (hashMode) {
+        mode.value = hashMode
+      } else if (window.location.hash === '' || window.location.hash === '#immersive' || window.location.hash === '#3d') {
+        mode.value = 'immersive'
+      }
+    })
+  }
 
   // ==========================================
   // 3D FLIGHT TOGGLE (navbar switch)
