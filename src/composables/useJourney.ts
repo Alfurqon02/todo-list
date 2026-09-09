@@ -90,7 +90,7 @@ export const JOURNEY_LENGTH = JOURNEY_STATIONS.length
 export const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v)
 export const smooth01 = (v: number) => {
   const x = clamp01(v)
-  return x * x * (3 - 2 * x)
+  return x * x * x * (x * (x * 6 - 15) + 10)
 }
 export const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 
@@ -135,7 +135,7 @@ export const journeyHold = (i: number) => JOURNEY_STATIONS[i]?.hold ?? 0.6
  */
 export const DOLLY_IN_END = 0.45
 export const DOLLY_OUT_SPAN = 0.41
-export const NEAR_Z_FACTOR = 0.45
+export const NEAR_Z_FACTOR = 0.78
 export const NEAR_Z_MIN = 2.6
 
 export const stationDwell = (i: number) =>
@@ -318,7 +318,7 @@ export function journeyPhase(index: number, p: number): JourneyPhase {
  * Emission is the exact mirror: the copy comes back out of the artifact small
  * and grows into place.
  */
-export const STAGE_RECEDE = 0.32
+export const STAGE_RECEDE = 0.035
 
 export function stageMagnification(_index: number, ph: JourneyPhase): number {
   if (ph.dir === 0) return 1
@@ -382,7 +382,7 @@ export function useJourneyStage(index: number) {
   })
 
   /** Peak blur, in px, at the point where the copy is fully dispersed. */
-  const blur = computed(() => (live.value ? (1 - presence.value) * 7 : 0))
+  const blur = computed(() => (live.value ? (1 - presence.value) * 1.5 : 0))
 
   const transform = computed(
     () => `translate3d(0, ${shift.value.toFixed(1)}px, 0) scale(${scale.value.toFixed(3)})`
@@ -396,210 +396,34 @@ export function useJourneyStage(index: number) {
   return { opacity, scale, shift, blur, transform, filter, presence }
 }
 
-/**
- * ── SHARDS ──
- *
- * The artifact eats the copy, then hands the next section's copy back out.
- *
- * Each block of text is drawn in toward wherever the artifact actually sits on
- * screen, shrinking and spinning as it goes, until it disappears into it. On
- * the far side of the morph the next section's blocks are emitted from that
- * same point and settle into their layout positions. Blocks are staggered, so
- * the artifact swallows and releases them one after another rather than all at
- * once.
- *
- * Timing is taken from `shardPull`, which is matched to the artifact: swallowed
- * over 0 -> 0.50 while it comes apart, emitted over 0.66 -> 1.00 while the next
- * one re-forms, and nothing emitted during the loose swarm between the two.
- *
- * Positions come from offsetLeft/offsetTop rather than getBoundingClientRect,
- * because the container is under a scroll-driven transform and offset geometry
- * ignores transforms — so a block can be measured correctly at any moment.
- * The travel is divided by the container's own magnification, otherwise the
- * container scaling up would carry the blocks past the artifact.
- */
+/** Small staggered lifts keep the copy readable as the sculpture changes. */
 export function useJourneyShards(index: number, container: Ref<HTMLElement | null>) {
   const store = useExperienceStore()
-
-  interface Shard {
-    el: HTMLElement
-    /** This block's own centre, in absolute layout pixels. */
-    kx: number
-    ky: number
-    spin: number
-    stagger: number
-  }
-  let shards: Shard[] = []
-  /** The artifact's centre and the transformed container's centre. */
-  let target: { x: number; y: number } | null = null
-  let origin: { x: number; y: number } | null = null
-  /** The ancestor carrying the scroll-driven transform, once found. */
-  let scaled: HTMLElement | null = null
-  /**
-   * Cleared every time the section parks, so each flight measures the layout
-   * afresh. All of this geometry comes from offsetLeft/offsetTop and is
-   * therefore transform-free, which makes it safe to read at any moment —
-   * and caching it for the life of the component was not safe, because a
-   * viewport change that does not raise a resize event left it stale and the
-   * blocks flew at a point hundreds of pixels off the artifact.
-   */
-  let geomReady = false
-
-  function layoutCentre(el: HTMLElement) {
-    let x = 0
-    let y = 0
-    let n: HTMLElement | null = el
-    while (n) {
-      x += n.offsetLeft
-      y += n.offsetTop
-      n = n.offsetParent as HTMLElement | null
-    }
-    return { x: x + el.offsetWidth / 2, y: y + el.offsetHeight / 2 }
-  }
-
-  /** Where the artifact is, in the same absolute layout space. */
-  function artifactCentre(): { x: number; y: number } | null {
-    const cfg = JOURNEY_STATIONS[index]
-    if (cfg?.frame) {
-      const f = document.querySelector(cfg.frame) as HTMLElement | null
-      // offsetWidth 0 means the frame is hidden (the mobile layout drops it),
-      // in which case the artifact is a centred backdrop instead.
-      if (f && f.offsetWidth > 1) return layoutCentre(f)
-    }
-    const secSel = cfg?.section
-    const sec = secSel ? (document.querySelector(secSel) as HTMLElement | null) : null
-    if (!sec) return null
-    const c = layoutCentre(sec)
-    // Unframed artifacts sit in the middle of the viewport, not the section.
-    return { x: c.x, y: window.scrollY + window.innerHeight / 2 }
-  }
-
-  /**
-   * The ancestor that useJourneyStage is scaling. Its transform has to be
-   * undone for the blocks to land on the artifact rather than being carried
-   * past it, and reading the applied value is safer than recomputing it.
-   */
-  function findScaled(): HTMLElement | null {
-    if (scaled && scaled.isConnected) return scaled
-    let n: HTMLElement | null = container.value
-    while (n) {
-      if ((n.style.transform || '').includes('scale(')) {
-        scaled = n
-        return n
-      }
-      n = n.parentElement
-    }
-    return null
-  }
-
-  function collect() {
-    const root = container.value
-    if (!root) return
-    let kids = Array.from(root.children) as HTMLElement[]
-    // One or two blocks give no stagger to speak of; drop a level so there is
-    // something to actually feed in.
-    if (kids.length < 3) {
-      const deeper = kids.flatMap((k) => Array.from(k.children) as HTMLElement[])
-      if (deeper.length >= 3) kids = deeper
-    }
-    const last = Math.max(1, kids.length - 1)
-    shards = kids.map((el, k) => ({
-      el,
-      kx: 0,
-      ky: 0,
-      spin: (k % 2 === 0 ? 1 : -1) * (18 + (k % 3) * 9),
-      stagger: kids.length > 1 ? k / last : 0,
-    }))
-    geomReady = false
-  }
-
-  /** Re-reads every layout position this effect depends on. */
-  function measureGeometry(box: HTMLElement) {
-    target = artifactCentre()
-    origin = layoutCentre(box)
-    for (const s of shards) {
-      const c = layoutCentre(s.el)
-      s.kx = c.x
-      s.ky = c.y
-    }
-    geomReady = true
-  }
+  let blocks: HTMLElement[] = []
 
   function reset() {
-    for (const s of shards) {
-      s.el.style.transform = ''
-      s.el.style.opacity = ''
+    for (const el of blocks) {
+      el.style.transform = ''
+      el.style.opacity = ''
     }
   }
 
   function apply() {
-    if (!shards.length) return
     if (!store.animationsEnabled || store.mode !== 'immersive') return reset()
-
-    const ph = journeyPhase(index, store.journeyProgress)
-    if (ph.dir === 0) {
-      // Parked is the one moment the layout is definitely settled, so this is
-      // where the next flight's measurements get invalidated.
-      geomReady = false
-      return reset()
-    }
-
-    const box = findScaled()
-    // Nothing to undo yet: the container is not being transformed this frame.
-    if (!box) return
-    if (!geomReady) measureGeometry(box)
-    if (!target || !origin) return
-
-    // The container is scaled about its own centre and nudged vertically, so a
-    // block's on-screen centre is  origin + shift + m * ((block - origin) + t).
-    // Solving that for the t which puts the block on the artifact gives the
-    // offsets below. Read off the applied transform rather than recomputed, so
-    // the two can never disagree.
-    const applied = (box && box.style.transform) || ''
-    const m = parseFloat((/scale\(([\d.]+)\)/.exec(applied) || ['', '1'])[1]) || 1
-    const sy = parseFloat((/translate3d\([^,]+,\s*(-?[\d.]+)px/.exec(applied) || ['', '0'])[1]) || 0
-
-    for (const s of shards) {
-      const pull = shardPull(ph, s.stagger)
-      if (pull < 0.001) {
-        s.el.style.transform = ''
-        s.el.style.opacity = ''
-        continue
-      }
-      const fullX = (target.x - origin.x) / m - (s.kx - origin.x)
-      const fullY = (target.y - origin.y - sy) / m - (s.ky - origin.y)
-      s.el.style.transform =
-        `translate3d(${(fullX * pull).toFixed(1)}px, ${(fullY * pull).toFixed(1)}px, 0) ` +
-        `rotate(${(s.spin * pull).toFixed(2)}deg) ` +
-        `scale(${(1 - pull * 0.88).toFixed(3)})`
-      // Only a partial dip; the container owns the rest of the fade.
-      s.el.style.opacity = (1 - pull * 0.82).toFixed(3)
-    }
-  }
-
-  function remeasure() {
-    scaled = null
-    target = null
-    origin = null
-    geomReady = false
-    collect()
-    apply()
+    const phase = journeyPhase(index, store.journeyProgress)
+    if (phase.dir === 0) return reset()
+    blocks.forEach((el, i) => {
+      const pull = shardPull(phase, i / Math.max(1, blocks.length - 1))
+      const direction = phase.dir === -1 ? 1 : -1
+      el.style.transform = `translate3d(0, ${direction * pull * 18}px, 0)`
+      el.style.opacity = String(1 - pull * 0.3)
+    })
   }
 
   onMounted(() => {
-    remeasure()
-    window.addEventListener('resize', remeasure, { passive: true })
+    blocks = Array.from(container.value?.children ?? []) as HTMLElement[]
+    apply()
   })
-  onBeforeUnmount(() => {
-    window.removeEventListener('resize', remeasure)
-    reset()
-  })
-
-  // flush: 'post' matters. The container's transform is written by
-  // useJourneyStage during the same reactive tick, and this reads it back to
-  // undo it — on the default pre-flush it would see the previous frame's value,
-  // which on the first frame of a flight is no transform at all, and the blocks
-  // would be measured against the wrong element entirely.
-  watch(() => store.journeyProgress, apply, { flush: 'post' })
-  watch(() => [store.animationsEnabled, store.mode], remeasure, { flush: 'post' })
+  onBeforeUnmount(reset)
+  watch(() => [store.journeyProgress, store.animationsEnabled, store.mode], apply, { flush: 'post' })
 }

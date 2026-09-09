@@ -146,7 +146,7 @@
 }
 
 html {
-  scroll-behavior: smooth;
+  scroll-behavior: auto !important;
   background-color: var(--bg-abyss);
   color: var(--text-main);
   font-family: 'Rajdhani', 'Inter', system-ui, sans-serif;

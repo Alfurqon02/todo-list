@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import * as THREE from 'three'
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
+import { createMorphMaterial } from '@/utils/morphMaterial'
 import { useExperienceStore } from '@/stores/experienceStore'
 import { experiences } from '@/data/portfolioData'
 import { samplePoints } from '@/utils/sampleGeometry'
@@ -70,12 +72,13 @@ let currentArchiveSpin = 0
 // -> the camera pulls out onto it. The next shape has zero opacity until the
 // swarm has almost finished building it, so it is never sitting there in
 // advance waiting to be zoomed at.
-const MORPH_COUNT = 12000
+const MORPH_COUNT = window.matchMedia('(pointer: coarse)').matches ? 4500 : 10000
+let environmentTarget: THREE.WebGLRenderTarget | null = null
+let morphMaterial: THREE.ShaderMaterial | null = null
+let morphAttributes: THREE.BufferAttribute[] = []
+let morphStation = -1
 let morphPoints: THREE.Points | null = null
 let morphGeo: THREE.BufferGeometry | null = null
-let morphPos: Float32Array | null = null
-/** 6 per particle: leave-stagger, return-stagger, radius, theta, phi, spin. */
-let morphSeed: Float32Array | null = null
 /** Per-station sample sets, held in the artifact's own local space. */
 let morphTargets: Float32Array[] = []
 /** Largest half-extent of each station's samples, used to fit it to its frame. */
@@ -119,9 +122,6 @@ let mouseY = 0
 let targetMouseX = 0
 let targetMouseY = 0
 
-const vA = new THREE.Vector3()
-const vB = new THREE.Vector3()
-const vS = new THREE.Vector3()
 
 function onMouseMove(e: MouseEvent) {
   const w = window.innerWidth
@@ -165,11 +165,11 @@ function buildGyroCore(): THREE.Group {
   const solidMat = new THREE.MeshStandardMaterial({
     color: 0x0096ff,
     emissive: 0x00f3ff,
-    emissiveIntensity: 0.6,
-    roughness: 0.3,
+    emissiveIntensity: 0.12,
+    roughness: 0.2,
     metalness: 0.9,
   })
-  g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.62, 0), solidMat))
+  g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.84, 2), solidMat))
 
   const ringConfigs = [
     { r: 1.35, c: 0x00f3ff, rot: [Math.PI / 4, 0, 0] },
@@ -177,9 +177,13 @@ function buildGyroCore(): THREE.Group {
     { r: 1.86, c: 0x00f3ff, rot: [0, 0, Math.PI / 6] },
   ]
   gyroRings = ringConfigs.map((cfg) => {
-    const ringGeo = new THREE.TorusGeometry(cfg.r, 0.022, 12, 56)
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: cfg.c,
+    const ringGeo = new THREE.TorusGeometry(cfg.r, 0.047, 16, 96)
+    const ringMat = new THREE.MeshStandardMaterial({
+      color: 0x9cdde8,
+      metalness: 0.85,
+      roughness: 0.22,
+      emissive: cfg.c,
+      emissiveIntensity: 0.12,
       transparent: true,
       opacity: 0.8,
     })
@@ -227,12 +231,13 @@ function buildNeuralKnot(): THREE.Group {
   g.add(pose)
 
   knotOuter = new THREE.Mesh(
-    new THREE.TorusKnotGeometry(1.1, 0.13, 128, 10, 2, 3),
-    new THREE.MeshBasicMaterial({
-      color: 0x00f3ff,
-      wireframe: true,
+    new THREE.TorusKnotGeometry(1.1, 0.19, 192, 20, 2, 3),
+    new THREE.MeshStandardMaterial({
+      color: 0x79cddd,
+      metalness: 0.8,
+      roughness: 0.22,
       transparent: true,
-      opacity: 0.6,
+      opacity: 0.95,
     })
   )
   pose.add(knotOuter)
@@ -285,11 +290,13 @@ function buildTower(): THREE.Group {
 
   const coreGeo = new THREE.CylinderGeometry(1.5, 1.5, 10, 32, 1, true)
   const coreMat = new THREE.MeshStandardMaterial({
-    color: 0x0096ff,
+    color: 0x12313e,
     emissive: 0x00f3ff,
-    emissiveIntensity: 0.8,
+    emissiveIntensity: 0.08,
+    metalness: 0.85,
+    roughness: 0.3,
     transparent: true,
-    opacity: 0.75,
+    opacity: 0.55,
     side: THREE.DoubleSide,
   })
   towerCore = new THREE.Mesh(coreGeo, coreMat)
@@ -300,7 +307,7 @@ function buildTower(): THREE.Group {
     color: 0x00f3ff,
     wireframe: true,
     transparent: true,
-    opacity: 0.35,
+    opacity: 0.16,
   })
   g.add(new THREE.Mesh(cageGeo, cageMat))
 
@@ -532,33 +539,18 @@ function buildDust(): THREE.LineSegments {
 
 function buildMorphCloud(): THREE.Points {
   morphGeo = new THREE.BufferGeometry()
-  morphPos = new Float32Array(MORPH_COUNT * 3)
-  morphSeed = new Float32Array(MORPH_COUNT * 6)
-
-  for (let i = 0; i < MORPH_COUNT; i++) {
-    const s = i * 6
-    morphSeed[s] = Math.random() // when this particle lets go
-    morphSeed[s + 1] = Math.random() // when it starts packing back down
-    morphSeed[s + 2] = 1.5 + Math.random() * 4.0 // scatter radius
-    morphSeed[s + 3] = Math.random() * Math.PI * 2 // scatter theta
-    morphSeed[s + 4] = Math.acos(Math.random() * 2 - 1) // scatter phi
-    morphSeed[s + 5] = 0.4 + Math.random() * 1.6 // swarm spin rate
-  }
-
-  morphGeo.setAttribute('position', new THREE.BufferAttribute(morphPos, 3))
-  const mat = new THREE.PointsMaterial({
-    color: 0x00f3ff,
-    size: 0.03,
-    sizeAttenuation: true,
-    transparent: true,
-    opacity: 0.9,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  })
-
-  const pts = new THREE.Points(morphGeo, mat)
-  pts.frustumCulled = false
-  return pts
+  morphAttributes = morphTargets.map((points) => new THREE.BufferAttribute(points, 3))
+  // Retain every uploaded buffer on the geometry so dispose releases them all.
+  morphAttributes.forEach((attribute, i) => morphGeo!.setAttribute(`station${i}`, attribute))
+  const seeds = new Float32Array(MORPH_COUNT * 3)
+  for (let i = 0; i < seeds.length; i++) seeds[i] = Math.random()
+  morphGeo.setAttribute('position', morphAttributes[0])
+  morphGeo.setAttribute('aTarget', morphAttributes[1])
+  morphGeo.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 3))
+  morphMaterial = createMorphMaterial()
+  const points = new THREE.Points(morphGeo, morphMaterial)
+  points.frustumCulled = false
+  return points
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -576,7 +568,7 @@ interface MatRef {
 interface Station {
   group: THREE.Group
   mats: MatRef[]
-  detail?: (t: number) => void
+  detail?: (t: number, dt: number) => void
 }
 
 let stations: Station[] = []
@@ -641,6 +633,11 @@ function applyCanvasTheme() {
     }
   }
 
+  if (morphMaterial) {
+    morphMaterial.uniforms.uColor.value.set(dark ? 0x8ceeff : 0x0f5f7d)
+    morphMaterial.blending = dark ? THREE.AdditiveBlending : THREE.NormalBlending
+    morphMaterial.needsUpdate = true
+  }
   if (scene) {
     scene.fog = new THREE.FogExp2(dark ? 0x030712 : 0xf4f7fb, dark ? 0.014 : 0.02)
   }
@@ -649,7 +646,7 @@ function applyCanvasTheme() {
     headlight.intensity = dark ? 4.0 : 2.2
   }
 
-  for (const pts of [morphPoints, dust]) {
+  for (const pts of [dust]) {
     if (!pts) continue
     const mat = pts.material as THREE.PointsMaterial | THREE.LineBasicMaterial
     mat.blending = dark ? THREE.AdditiveBlending : THREE.NormalBlending
@@ -664,44 +661,41 @@ function buildStations() {
     {
       group: gyroGroup!,
       mats: collectMats(gyroGroup!),
-      detail: () => {
+      detail: (t, dt) => {
         if (!gyroGroup) return
-        gyroGroup.rotation.y += 0.008
-        if (gyroInnerIco) gyroInnerIco.rotation.x += 0.01
-        if (gyroRings[0]) gyroRings[0].rotation.x += 0.015
-        if (gyroRings[1]) gyroRings[1].rotation.y += 0.012
-        if (gyroRings[2]) gyroRings[2].rotation.z += 0.018
+        gyroGroup.rotation.y = t * 0.16
+        gyroGroup.rotation.x = Math.sin(t * 0.12) * 0.16
       },
     },
     // 01 — ABOUT: biometric scanner core
     {
       group: knotGroup!,
       mats: collectMats(knotGroup!),
-      detail: () => {
+      detail: (t, dt) => {
         if (!knotGroup) return
         // Tumbles on two axes; the shell counter-rotates against the core so
         // the weave reads as woven rather than as one solid lump.
         // Only the station group turns, so the baked pose (and the morph
         // points sampled through it) stay locked together.
-        knotGroup.rotation.y += 0.006
+        knotGroup.rotation.y = t * 0.12
       },
     },
     // 02 — EXPERIENCE: the cylinder tower, yawed by the carousel
     {
       group: towerGroup!,
       mats: collectMats(towerGroup!),
-      detail: () => {
+      detail: (t, dt) => {
         if (!towerGroup) return
         towerGroup.rotation.y = store.carouselRotation
         // The ring for the role on the front card lights up and widens.
         const activeRole = store.activeNodeIndex
         towerRings.forEach((ring, i) => {
-          ring.rotation.y += i % 2 === 0 ? 0.008 : -0.006
+          ring.rotation.y = t * (i % 2 === 0 ? 0.12 : -0.1)
           const on = i === activeRole
-          const s = ring.scale.x + ((on ? 1.13 : 1.0) - ring.scale.x) * 0.12
+          const s = ring.scale.x + ((on ? 1.13 : 1.0) - ring.scale.x) * (1 - Math.exp(-7 * dt))
           ring.scale.set(s, 1, s)
           const mat = (ring.children[0] as THREE.Mesh).material as THREE.MeshBasicMaterial
-          mat.color.lerp(themed(NODE_COLOR[on ? 1 : 0]), 0.12)
+          mat.color.lerp(themed(NODE_COLOR[on ? 1 : 0]), 1 - Math.exp(-7 * dt))
         })
       },
     },
@@ -709,21 +703,21 @@ function buildStations() {
     {
       group: latticeGroup!,
       mats: collectMats(latticeGroup!),
-      detail: () => {
+      detail: (t, dt) => {
         if (!latticeGroup) return
-        latticeGroup.rotation.y += 0.005
+        latticeGroup.rotation.y = Math.sin(t * 0.1) * 0.35
 
         // Eased so selecting a category glows in rather than popping.
         const activeIdx = store.activeSkillIndex
         latticeNodes.forEach((node, i) => {
           const mat = node.material as THREE.MeshStandardMaterial
           const on = i === activeIdx ? 1 : 0
-          const s = node.scale.x + ((on ? 1.6 : 1.0) - node.scale.x) * 0.12
+          const s = node.scale.x + ((on ? 1.6 : 1.0) - node.scale.x) * (1 - Math.exp(-7 * dt))
           node.scale.setScalar(s)
-          node.rotation.y += 0.03
-          mat.emissiveIntensity += ((on ? 1.2 : 0.4) - mat.emissiveIntensity) * 0.12
-          mat.emissive.lerp(themed(NODE_EMISSIVE[on]), 0.12)
-          mat.color.lerp(themed(NODE_COLOR[on]), 0.12)
+          node.rotation.y = t * 0.3
+          mat.emissiveIntensity += ((on ? 1.2 : 0.4) - mat.emissiveIntensity) * (1 - Math.exp(-7 * dt))
+          mat.emissive.lerp(themed(NODE_EMISSIVE[on]), 1 - Math.exp(-7 * dt))
+          mat.color.lerp(themed(NODE_COLOR[on]), 1 - Math.exp(-7 * dt))
         })
       },
     },
@@ -731,18 +725,18 @@ function buildStations() {
     {
       group: archiveGroup!,
       mats: collectMats(archiveGroup!),
-      detail: (t) => {
+      detail: (t, dt) => {
         if (!archiveGroup) return
         // Eased so swapping the active publication glides instead of snapping
         // a quarter turn in a single frame.
-        currentArchiveSpin += (store.activeResearchIndex * 1.2 - currentArchiveSpin) * 0.06
+        currentArchiveSpin += (store.activeResearchIndex * 1.2 - currentArchiveSpin) * (1 - Math.exp(-4 * dt))
         archiveGroup.rotation.y = t * 0.18 + currentArchiveSpin
         // The plate for the publication currently on the card lifts clear.
         archivePlates.forEach((plate, i) => {
           const on = i === store.activeResearchIndex
           const restY = -0.45 + i * 0.9
-          plate.position.y += (restY + (on ? 0.22 : 0) - plate.position.y) * 0.08
-          plate.rotation.y += (i * 0.5 + (on ? 0.4 : 0) - plate.rotation.y) * 0.06
+          plate.position.y += (restY + (on ? 0.22 : 0) - plate.position.y) * (1 - Math.exp(-5 * dt))
+          plate.rotation.y += (i * 0.5 + (on ? 0.4 : 0) - plate.rotation.y) * (1 - Math.exp(-4 * dt))
         })
       },
     },
@@ -752,10 +746,10 @@ function buildStations() {
     {
       group: voidGroup!,
       mats: [],
-      detail: () => {
+      detail: (t, dt) => {
         if (!voidGroup) return
-        voidGroup.rotation.y += 0.0015
-        voidGroup.rotation.x += 0.0007
+        voidGroup.rotation.y = t * 0.06
+        voidGroup.rotation.x = t * 0.025
       },
     },
   ]
@@ -774,7 +768,15 @@ function initThree() {
   camera = new THREE.PerspectiveCamera(45, viewW / viewH, 0.1, 220)
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, viewW < 768 ? 1.25 : 1.75))
+  renderer.toneMapping = THREE.ACESFilmicToneMapping
+  renderer.toneMappingExposure = 1.15
+  const pmrem = new THREE.PMREMGenerator(renderer)
+  const studio = new RoomEnvironment()
+  environmentTarget = pmrem.fromScene(studio, 0.04)
+  scene.environment = environmentTarget.texture
+  studio.dispose()
+  pmrem.dispose()
   renderer.setSize(viewW, viewH)
   containerRef.value.appendChild(renderer.domElement)
 
@@ -930,12 +932,14 @@ function layoutScale() {
 
 let lastTime = 0
 let nextFrameSweep = 0
+let elapsedTime = 0
 
 function renderLoop(time = 0) {
   // Clamped so a backgrounded tab does not resume with one enormous step.
   const dt = Math.min(0.05, Math.max(0.001, (time - lastTime) * 0.001))
   lastTime = time
-  const t = time * 0.001
+  elapsedTime += dt
+  const t = elapsedTime
 
   // Sections mount after this canvas, and pin-spacers and web fonts can reflow
   // the frames a beat later, so keep re-measuring over the first few seconds.
@@ -950,7 +954,7 @@ function renderLoop(time = 0) {
   mouseY = approach(mouseY, targetMouseY, 3.5, dt)
 
   prevJourneyProgress = currentJourneyProgress
-  currentJourneyProgress = approach(currentJourneyProgress, store.journeyProgress, 7.0, dt)
+  currentJourneyProgress = store.journeyProgress
   const p = currentJourneyProgress
 
   const lastIdx = JOURNEY_STATIONS.length - 1
@@ -988,14 +992,14 @@ function renderLoop(time = 0) {
       ? lerp(dwellHere, nearZ, smooth01(morph / DOLLY_IN_END))
       : lerp(nearZ, dwellThere, smooth01((morph - DOLLY_IN_END) / DOLLY_OUT_SPAN))
 
-  camZ = approach(camZ, targetZ, 6.5, dt)
+  camZ = targetZ
 
   if (camera) {
-    camera.position.set(mouseX * 0.5, -mouseY * 0.4, camZ)
+    camera.position.set(mouseX * 0.16, -mouseY * 0.12, camZ)
     camera.lookAt(0, 0, 0)
     // A touch of lens widening at the peak of the push, to sell the dive.
     // Tracks the dolly, so it is back to normal once the artifact is parked.
-    const fov = 45 + Math.sin(Math.PI * clamp01(morph / 0.86)) * 13
+    const fov = 45 + Math.sin(Math.PI * clamp01(morph / 0.86)) * 3
     if (Math.abs(camera.fov - fov) > 0.01) {
       camera.fov = fov
       camera.updateProjectionMatrix()
@@ -1022,8 +1026,8 @@ function renderLoop(time = 0) {
       ? smooth01((clamp01(p - lastIdx) - FINAL_EXIT_START) / FINAL_EXIT_SPAN)
       : 0
 
-  stageX = approach(stageX, lerp(xHere, xThere, slide), 5.0, dt)
-  stageY = approach(stageY, lerp(yHere, yThere, slide) + exit * FINAL_EXIT_RISE, 5.0, dt)
+  stageX = lerp(xHere, xThere, slide)
+  stageY = lerp(yHere, yThere, slide) + exit * FINAL_EXIT_RISE
 
   if (stageGroup) {
     stageGroup.position.set(stageX, stageY, 0)
@@ -1050,11 +1054,12 @@ function renderLoop(time = 0) {
   for (let i = 0; i < stations.length; i++) {
     const st = stations[i]
     const active = i === idx || (morphing && i === nextIdx)
+    // The incoming surface must already have its live pose while invisible.
+    if (active) st.detail?.(t, dt)
 
     // The closing station has no mesh at all, only the scattered cloud, but it
     // still needs its idle motion ticked.
     if (!st.mats.length) {
-      if (active) st.detail?.(t)
       continue
     }
 
@@ -1068,7 +1073,6 @@ function renderLoop(time = 0) {
     for (let m = 0; m < st.mats.length; m++) {
       st.mats[m].mat.opacity = st.mats[m].base * alpha
     }
-    st.detail?.(t)
   }
 
   // ═════════════════════════════════════════════════════════════
@@ -1076,66 +1080,24 @@ function renderLoop(time = 0) {
   // drift as a swarm, then pack down onto the next artifact
   // ═════════════════════════════════════════════════════════════
 
-  if (morphPos && morphSeed && morphGeo && morphPoints && scene) {
-    scene.updateMatrixWorld(true)
-    const mFrom = stations[idx].group.matrix
-    const mTo = stations[nextIdx].group.matrix
-    const from = morphTargets[idx]
-    const to = morphTargets[nextIdx]
-
-    for (let i = 0; i < MORPH_COUNT; i++) {
-      const k = i * 3
-      const s = i * 6
-
-      // Staggered so the shape unravels and re-knits rather than sliding.
-      // Departures spread across 0 .. 0.50 to match the mesh fading out, and
-      // arrivals across 0.52 .. 1.00 so the last particle lands on the frame
-      // the mesh finishes solidifying.
-      const leave = clamp01((morph - morphSeed[s] * 0.22) / 0.28)
-      const back = clamp01((morph - (0.52 + morphSeed[s + 1] * 0.16)) / 0.32)
-      const d = smooth01(leave)
-      const r = smooth01(back)
-
-      vA.fromArray(from, k).applyMatrix4(mFrom)
-
-      if (d > 0.0005) {
-        // Loose swarm position: a slowly turning shell around the stage.
-        const spin = t * morphSeed[s + 5] * 0.5
-        const theta = morphSeed[s + 3] + spin
-        const phi = morphSeed[s + 4]
-        const rad = morphSeed[s + 2]
-        const sp = Math.sin(phi)
-        vS.set(rad * sp * Math.cos(theta), rad * Math.cos(phi), rad * sp * Math.sin(theta))
-        vA.lerp(vS, d)
-
-        if (r > 0.0005) {
-          vB.fromArray(to, k).applyMatrix4(mTo)
-          vA.lerp(vB, r)
-        }
-      }
-
-      morphPos[k] = vA.x
-      morphPos[k + 1] = vA.y
-      morphPos[k + 2] = vA.z
+  if (morphGeo && morphPoints && morphMaterial) {
+    if (morphStation !== idx) {
+      morphGeo.setAttribute('position', morphAttributes[idx])
+      morphGeo.setAttribute('aTarget', morphAttributes[nextIdx])
+      morphStation = idx
     }
-
-    morphGeo.attributes.position.needsUpdate = true
-
-    // Points are a faint shimmer on a solid artifact and the whole show
-    // while it is in pieces.
-    // Envelope over the stretch where the artifact is genuinely just points:
-    // up by 0.50, held through the dispersed phase, then handing over to the
-    // mesh on the same curve the mesh uses to solidify.
-    const loose = smooth01(morph / 0.5) * (1 - smooth01((morph - 0.68) / 0.32))
-    const mat = morphPoints.material as THREE.PointsMaterial
-    mat.size = 0.028 + loose * 0.034
-    // Barely there on a solid artifact (the sub-parts spin independently of
-    // the station matrix, so resting points drift a little off the geometry),
-    // and the entire show once it is in pieces.
-    //
-    // The closing station is the exception: it has no mesh at all, so the
-    // debris field IS the visual there and gets to stay bright.
-    mat.opacity = idx >= lastIdx ? 0.72 : 0.16 + loose * 0.8
+    // Update both endpoint poses, including the invisible incoming object.
+    stations[nextIdx].group.updateMatrix()
+    stations[idx].group.updateMatrix()
+    const u = morphMaterial.uniforms
+    u.uFrom.value.copy(stations[idx].group.matrix)
+    u.uTo.value.copy(stations[nextIdx].group.matrix)
+    u.uProgress.value = morph
+    u.uTime.value = t
+    u.uPixelRatio.value = renderer?.getPixelRatio() ?? 1
+    const loose = smooth01(morph / 0.45) * (1 - smooth01((morph - 0.68) / 0.32))
+    u.uOpacity.value = idx >= lastIdx ? 0.48 : loose * 0.78
+    morphPoints.visible = u.uOpacity.value > 0.002
   }
 
   // ═════════════════════════════════════════════════════════════
@@ -1145,8 +1107,8 @@ function renderLoop(time = 0) {
   if (dustVerts && dustSeed && dustGeo && dust) {
     const journeyVel = (Math.abs(p - prevJourneyProgress) / dt) * 26
     dustSpeed = approach(dustSpeed, Math.min(journeyVel, 150), 8.0, dt)
-    const half = (0.4 + dustSpeed * 0.07) * 0.5
-    const drift = (4 + dustSpeed * 1.6) * dt
+    const half = (0.06 + dustSpeed * 0.008) * 0.5
+    const drift = (0.6 + dustSpeed * 0.25) * dt
 
     for (let i = 0; i < DUST_COUNT; i++) {
       const s = i * 3
@@ -1169,7 +1131,7 @@ function renderLoop(time = 0) {
 
     dustGeo.attributes.position.needsUpdate = true
     const mat = dust.material as THREE.LineBasicMaterial
-    mat.opacity = 0.14 + Math.min(1, dustSpeed / 70) * 0.4
+    mat.opacity = 0.08 + Math.min(1, dustSpeed / 70) * 0.12
   }
 
   if (renderer && scene && camera) {
@@ -1193,6 +1155,23 @@ function disposeScene() {
     cancelAnimationFrame(animFrameId)
     animFrameId = null
   }
+  const geometries = new Set<THREE.BufferGeometry>()
+  const materials = new Set<THREE.Material>()
+  scene?.traverse((object) => {
+    const mesh = object as THREE.Mesh
+    if (mesh.geometry) geometries.add(mesh.geometry)
+    if (mesh.material) {
+      const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+      list.forEach((material) => materials.add(material))
+    }
+  })
+  geometries.forEach((geometry) => geometry.dispose())
+  materials.forEach((material) => material.dispose())
+  environmentTarget?.dispose()
+  environmentTarget = null
+  morphMaterial = null
+  morphAttributes = []
+  morphStation = -1
   if (renderer) {
     renderer.dispose()
     const dom = renderer.domElement
@@ -1213,8 +1192,6 @@ function disposeScene() {
   dustSeed = null
   morphPoints = null
   morphGeo = null
-  morphPos = null
-  morphSeed = null
 }
 
 watch(
@@ -1223,7 +1200,17 @@ watch(
 )
 
 onMounted(() => {
-  initThree()
+  try {
+    initThree()
+  } catch (error) {
+    console.warn('3D is unavailable; using the static portfolio.', error)
+    disposeScene()
+    store.animationsEnabled = false
+    return
+  }
+  document.fonts?.ready.then(() => {
+    if (renderer) measureFrames()
+  })
   // Watches the element itself, so a viewport that only becomes non-zero after
   // mount is picked up even though no resize event is dispatched for it.
   if (containerRef.value && typeof ResizeObserver !== 'undefined') {
@@ -1244,5 +1231,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="containerRef" class="fixed inset-0 pointer-events-none z-0 overflow-hidden" />
+  <div ref="containerRef" class="portfolio-stage fixed inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true" />
 </template>
+
+<style scoped>
+/* Stacked copy occupies the stage on smaller screens; keep its contrast. */
+@media (max-width: 1023px) {
+  .portfolio-stage { opacity: 0.18; }
+}
+</style>

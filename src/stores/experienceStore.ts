@@ -5,42 +5,13 @@ import { usePreferredReducedMotion, useStorage } from '@vueuse/core'
 export type ExperienceMode = 'immersive' | 'clean'
 
 export const useExperienceStore = defineStore('experience', () => {
-  // ==========================================
-  // DARK THEME (Always dark for Cybernetics theme)
-  // ==========================================
-  // Dark is the default and what the palette is designed around, but light is
-  // a real alternative rather than a forced value.
-  //
-  // Stored explicitly rather than through useDark(): that helper writes "auto"
-  // whenever the chosen theme happens to match the OS preference, so a visitor
-  // on a dark OS who picks light would silently get dark back on reload.
+  // Retain the storage key to migrate visitors who previously selected light.
   const theme = useStorage<'dark' | 'light'>('portfolio-theme', 'dark')
-  const isDark = computed(() => theme.value === 'dark')
-
-  function toggleDark() {
-    theme.value = theme.value === 'dark' ? 'light' : 'dark'
-  }
-
+  theme.value = 'dark'
+  const isDark = computed(() => true)
+  function toggleDark() { theme.value = 'dark' }
   watchEffect(() => {
-    if (typeof document === 'undefined') return
-    const root = document.documentElement
-
-    // `theme-switching` kills transitions for the duration of the swap, and
-    // reading offsetHeight forces the style pass to happen inside that window.
-    //
-    // The forced pass is not decorative. Swapping the palette variables alone
-    // leaves elements that were already on the page painted with their old
-    // resolved colours — the variables read correctly on those elements, but
-    // the properties consuming them are not re-resolved. Freshly created
-    // elements pick up the new theme fine, which is what makes it look like
-    // only part of the page responds. Verified on a production build: without
-    // this the cards, HUD buttons and telemetry tags stay dark in light mode.
-    root.classList.add('theme-switching')
-    // On <html> rather than <body> so the :root-level palette aliases in
-    // main.css resolve against the active theme.
-    root.classList.toggle('dark', theme.value === 'dark')
-    void root.offsetHeight
-    root.classList.remove('theme-switching')
+    if (typeof document !== 'undefined') document.documentElement.classList.add('dark')
   })
 
   // ==========================================
