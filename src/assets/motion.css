@@ -20,9 +20,10 @@
 
 .mline {
   display: block;
-  overflow: hidden;
-  padding: 0 0.08em 0.12em;
-  margin: 0 -0.08em -0.12em;
+  overflow-x: visible;
+  overflow-y: clip;
+  padding: 0.06em 0.14em 0.18em;
+  margin: -0.06em -0.14em -0.18em;
 }
 
 .mline > span {
