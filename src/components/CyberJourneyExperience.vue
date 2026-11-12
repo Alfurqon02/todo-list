@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onMounted, onBeforeUnmount, ref } from 'vue'
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onMounted,
+  onBeforeUnmount,
+  ref,
+   type ComponentPublicInstance,
+} from 'vue'
 import {
   ArrowUpRight,
   ArrowDown,
@@ -25,7 +33,14 @@ import {
   closeDialogAnimated,
   animatedCancel,
 } from '@/composables/useMotion'
-import { CYBER_STOPS, LAST_POSITION, CHAPTER_SCROLL_VH, flightAt, storyCopyAt } from '@/utils/cyberStory'
+import {
+  CYBER_STOPS,
+  LAST_POSITION,
+  CHAPTER_SCROLL_VH,
+  flightAt,
+  stagePoseAt,
+  splineProgressAt,
+} from '@/utils/cyberStory'
 import {
   personalInfo,
   experiences,
@@ -42,13 +57,22 @@ const store = useExperienceStore()
 
 const root = ref<HTMLElement | null>(null)
 const stage = ref<HTMLElement | null>(null)
-const copyPanel = ref<HTMLElement | null>(null)
 const vignetteEl = ref<HTMLElement | null>(null)
 const travelEl = ref<HTMLElement | null>(null)
 const cueEl = ref<HTMLElement | null>(null)
 const sceneNoteEl = ref<HTMLElement | null>(null)
+const telemetryDepthEl = ref<HTMLElement | null>(null)
+const telemetrySyncEl = ref<HTMLElement | null>(null)
 const trackEl = ref<HTMLElement | null>(null)
 const progressEl = ref<HTMLElement | null>(null)
+
+// Pre-mounted chapter stage elements (all 7 stay in DOM — zero Vue DOM creation during scroll)
+const stageEls: (HTMLElement | null)[] = [null, null, null, null, null, null, null]
+const stageVisibleState: boolean[] = [true, false, false, false, false, false, false]
+
+function setStageEl(index: number, el: Element | ComponentPublicInstance | null) {
+  stageEls[index] = el instanceof HTMLElement ? el : null
+}
 
 const { scrollTo } = useSmoothScroll()
 const journey = useCyberJourney(root)
@@ -70,11 +94,11 @@ const booted = ref(false)
 const bootProgress = ref(0)
 const bootStatus = computed(() =>
   bootProgress.value < 34
-    ? 'Initialising signal core'
+    ? 'Initialising crystalline core'
     : bootProgress.value < 68
-      ? 'Assembling 3D corridor'
+      ? 'Calibrating 3D signal spline'
       : bootProgress.value < 100
-        ? 'Locking bus telemetry'
+        ? 'Locking station telemetry'
         : 'Signal locked',
 )
 let bootFrame = 0
@@ -88,12 +112,12 @@ function runBoot(now: number) {
   const dt = Math.min(100, now - bootLast)
   bootLast = now
   const loaded = ready.value || failed.value
-  const ceiling = loaded && elapsed > 650 ? 100 : 90
-  const ease = 1 - Math.exp(-dt / (loaded ? 95 : 550))
+  const ceiling = loaded && elapsed > 520 ? 100 : 90
+  const ease = 1 - Math.exp(-dt / (loaded ? 85 : 500))
   bootProgress.value += (ceiling - bootProgress.value) * ease
   if (ceiling === 100 && bootProgress.value > 99.4) {
     bootProgress.value = 100
-    bootTimeout = setTimeout(finishBoot, 200)
+    bootTimeout = setTimeout(finishBoot, 160)
     return
   }
   bootFrame = requestAnimationFrame(runBoot)
@@ -105,7 +129,6 @@ function finishBoot() {
   booted.value = true
 }
 
-// Structured multi-page dossier modal without arbitrary word-splitting.
 interface DossierPage {
   kicker: string
   title: string
@@ -196,11 +219,13 @@ const emailSubject = ref('')
 const emailMessage = ref('')
 const copied = ref('')
 
-// Reactive chapter state updates ONLY when crossing chapter boundaries (not 60x/sec).
+// Reactive chapter state updates ONLY when crossing chapter boundaries (not 60-144x/sec).
 const active = ref(0)
 const flightIndex = ref(0)
 const visitedFloor = ref(0)
 const density = ref(0)
+let lastDepthText = ''
+let lastSyncText = ''
 
 function updateDensity() {
   const h = window.innerHeight
@@ -209,48 +234,80 @@ function updateDensity() {
 
 function applyFrameStyles(pos: number) {
   const phase = flightAt(pos)
-  const copy = storyCopyAt(pos)
+  const nearest = Math.min(CYBER_STOPS.length - 1, Math.max(0, Math.round(pos)))
 
-  if (active.value !== copy.index) {
-    active.value = copy.index
+  if (active.value !== nearest) {
+    active.value = nearest
   }
   if (flightIndex.value !== phase.index) {
     flightIndex.value = phase.index
   }
-  const fl = Math.floor(pos + 0.02)
+  const fl = Math.floor(pos + 0.05)
   if (visitedFloor.value !== fl) {
     visitedFloor.value = fl
   }
 
-  if (stage.value) {
-    stage.value.dataset.flight = phase.travel.toFixed(3)
+  // Update all 7 pre-mounted stage cards via direct GPU-composited transforms (zero VDOM diff)
+  let maxCardOpacity = 0
+  for (let i = 0; i < CYBER_STOPS.length; i++) {
+    const el = stageEls[i]
+    if (!el) continue
+    const pose = stagePoseAt(pos, i)
+    if (pose.opacity > maxCardOpacity) maxCardOpacity = pose.opacity
+
+    if (!pose.visible) {
+      if (stageVisibleState[i]) {
+        stageVisibleState[i] = false
+        el.style.visibility = 'hidden'
+        el.style.opacity = '0'
+        el.style.pointerEvents = 'none'
+        el.setAttribute('aria-hidden', 'true')
+      }
+      continue
+    }
+
+    if (!stageVisibleState[i]) {
+      stageVisibleState[i] = true
+      el.style.visibility = 'visible'
+      el.setAttribute('aria-hidden', 'false')
+    }
+
+    el.style.opacity = pose.opacity.toFixed(3)
+    el.style.transform = `translate3d(0, ${pose.y.toFixed(2)}px, 0) scale(${pose.scale.toFixed(4)})`
+    el.style.pointerEvents = pose.interactive ? 'auto' : 'none'
   }
-  if (copyPanel.value) {
-    const shift = (1 - copy.opacity) * (copy.entering ? 20 : -16)
-    copyPanel.value.style.opacity = copy.opacity.toFixed(4)
-    copyPanel.value.style.setProperty('--copy-shift', `${shift.toFixed(2)}px`)
-    const hidden = copy.opacity < 0.05
-    copyPanel.value.toggleAttribute('inert', hidden)
-    copyPanel.value.setAttribute('aria-hidden', String(hidden))
+
+  const splineT = splineProgressAt(pos)
+  const depthMeters = (-108 * splineT).toFixed(1)
+  if (telemetryDepthEl.value && depthMeters !== lastDepthText) {
+    lastDepthText = depthMeters
+    telemetryDepthEl.value.textContent = `${depthMeters}m`
   }
+  const syncPct = `${String(Math.round(splineT * 100)).padStart(3, '0')}%`
+  if (telemetrySyncEl.value && syncPct !== lastSyncText) {
+    lastSyncText = syncPct
+    telemetrySyncEl.value.textContent = syncPct
+  }
+
   if (vignetteEl.value) {
-    vignetteEl.value.style.opacity = (0.16 + copy.opacity * 0.84).toFixed(3)
+    vignetteEl.value.style.opacity = (0.28 + maxCardOpacity * 0.72).toFixed(3)
   }
   if (travelEl.value) {
-    travelEl.value.style.opacity = (1 - copy.opacity).toFixed(3)
+    const betweenOpacity = Math.max(0, 1 - maxCardOpacity * 1.15)
+    travelEl.value.style.opacity = betweenOpacity.toFixed(3)
   }
   if (cueEl.value) {
-    cueEl.value.style.opacity = (copy.index === 0 ? copy.opacity : 0).toFixed(3)
+    const heroOpacity = stagePoseAt(pos, 0).opacity
+    cueEl.value.style.opacity = heroOpacity.toFixed(3)
   }
   if (sceneNoteEl.value) {
-    sceneNoteEl.value.style.opacity = copy.opacity.toFixed(3)
+    sceneNoteEl.value.style.opacity = (0.45 + maxCardOpacity * 0.55).toFixed(3)
   }
   if (trackEl.value) {
-    const tp = Math.min(1, (phase.index + phase.travel) / (CYBER_STOPS.length - 1))
-    trackEl.value.style.setProperty('--track', tp.toFixed(4))
+    trackEl.value.style.setProperty('--track', splineT.toFixed(4))
   }
   if (progressEl.value) {
-    progressEl.value.style.transform = `scaleX(${Math.min(1, Math.max(0, pos / LAST_POSITION)).toFixed(4)})`
+    progressEl.value.style.transform = `scaleX(${splineT.toFixed(4)})`
   }
 }
 
@@ -261,22 +318,21 @@ const role = computed(() => experiences[store.activeNodeIndex % experiences.leng
 const skill = computed(() => skills[store.activeSkillIndex % skills.length])
 const travelLabel = computed(
   () =>
-    `${CYBER_STOPS[flightIndex.value].label} → ${CYBER_STOPS[Math.min(flightIndex.value + 1, 6)].label}`,
+    `0${flightIndex.value} ${CYBER_STOPS[flightIndex.value].label} ───► 0${Math.min(flightIndex.value + 1, 6)} ${CYBER_STOPS[Math.min(flightIndex.value + 1, 6)].label}`,
 )
 
 const SCENE_NOTES = [
-  '00 / PROCESSOR CORE',
-  '01 / 7 PRODUCTION SYSTEMS',
-  '02 / DENSENET-LSTM PIPELINE',
-  '03 / 4 OPERATIONAL DOMAINS',
-  '04 / 11-ROLE ARCHIVE BUS',
-  '05 / 6-RING TOOLKIT BUS',
-  '06 / DIRECT TERMINAL',
+  '00 // SIGNAL CORE MONOLITH',
+  '01 // 7-BLADE PRODUCTION RACK',
+  '02 // DENSENET-LSTM OPTICAL PRISM',
+  '03 // 4-ARENA ORBITAL NEXUS',
+  '04 // 11-NODE HELICAL ARCHIVE',
+  '05 // 6-CLUSTER GYRO MATRIX',
+  '06 // DIRECT UPLINK BEACON',
 ]
 
-const eyebrowLabel = useScramble(() => CYBER_STOPS[active.value].label.toUpperCase())
-const sceneNote = useScramble(() => SCENE_NOTES[active.value], 640)
-const travelText = useScramble(() => travelLabel.value.toUpperCase(), 600)
+const sceneNote = useScramble(() => SCENE_NOTES[active.value], 520)
+const travelText = useScramble(() => travelLabel.value.toUpperCase(), 480)
 
 function go(index: number) {
   menu.value = false
@@ -284,7 +340,7 @@ function go(index: number) {
   const chapter = Math.max(0, Math.min(6, index))
   const target = journey.start + chapter * journey.unit
   boostJourney(chapter)
-  scrollTo(target)
+  scrollTo(target, { duration: 1.25 })
   history.replaceState(null, '', `#${CYBER_STOPS[chapter].id}`)
 }
 
@@ -382,8 +438,10 @@ let offFrame: (() => void) | null = null
 
 onMounted(() => {
   updateDensity()
+  // Initialize visibility state on all 7 stage cards
+  stageVisibleState.fill(true)
   applyFrameStyles(journey.position)
-  offFrame = onCyberFrame(applyFrameStyles)
+  offFrame = onCyberFrame((pos) => applyFrameStyles(pos))
 
   const index = CYBER_STOPS.findIndex((stop) => `#${stop.id}` === location.hash)
   if (index > 0 && window.scrollY < 20) nextTick(() => go(index))
@@ -394,7 +452,7 @@ onMounted(() => {
   bootFrame = requestAnimationFrame(runBoot)
   setTimeout(() => {
     if (!booted.value) finishBoot()
-  }, 5500)
+  }, 4500)
 })
 
 onBeforeUnmount(() => {
@@ -436,7 +494,7 @@ onBeforeUnmount(() => {
       class="cyber-scroll"
       :style="{ height: `calc(100svh + ${LAST_POSITION * CHAPTER_SCROLL_VH}svh)` }"
     >
-      <div ref="stage" class="cyber-stage" :data-chapter="active" data-flight="0.000">
+      <div ref="stage" class="cyber-stage" :data-chapter="active">
         <div class="cyber-world" :class="{ ready }">
           <Canvas v-if="!failed" @ready="ready = true" @unavailable="failed = true" />
         </div>
@@ -454,6 +512,7 @@ onBeforeUnmount(() => {
             <a href="#research" :class="{ current: active === 2 }" @click.prevent="go(2)">
               Intelligence
             </a>
+            <a href="#about" :class="{ current: active === 3 }" @click.prevent="go(3)">Domains</a>
             <a href="#experience" :class="{ current: active === 4 }" @click.prevent="go(4)">
               Experience
             </a>
@@ -463,6 +522,11 @@ onBeforeUnmount(() => {
             </a>
           </nav>
           <div class="cyber-header-tools">
+            <div class="cyber-telemetry-pill" aria-hidden="true">
+              <span>Z <strong ref="telemetryDepthEl">0.0m</strong></span>
+              <span class="telemetry-sep">·</span>
+              <span>SYNC <strong ref="telemetrySyncEl">000%</strong></span>
+            </div>
             <button
               type="button"
               class="cyber-theme-btn"
@@ -520,359 +584,426 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <div
-          ref="copyPanel"
-          class="cyber-story-copy"
-          :data-density="density"
-          role="region"
-          :aria-label="`${CYBER_STOPS[active].label} details`"
-        >
-          <div class="cyber-chapter-eyebrow" :key="`eyebrow-${active}`">
-            <span class="cyber-chapter-number">0{{ active }}</span>
-            <span aria-hidden="true" class="cyber-eyebrow-label">{{ eyebrowLabel }}</span>
-            <span class="sr-only">{{ CYBER_STOPS[active].label }}</span>
-            <span class="eyebrow-rule" />
-          </div>
-
-          <!-- 00 / ORIGIN -->
-          <article v-if="active === 0" class="cyber-copy-content">
-            <p class="cyber-role-line">
-              Mohammad Al Furqon · Software Engineer &amp; ML Researcher
-            </p>
-            <h1>
-              <span class="mline mword"><span>Follow</span></span>
-              <span class="mline mword"><span>the</span></span>
-              <span class="mline mword">
-                <span>signal<span class="cyber-punctuation">.</span></span>
-              </span>
-            </h1>
-            <p class="cyber-lead">
-              Enter the production web systems, security architectures, and neural pipelines I
-              build—chained along one continuous signal bus.
-            </p>
-            <p class="cyber-support">
-              11 Roles · Enterprise HR Tech, Government APIs, National Accreditation, Security Ops
-              &amp; Medical AI · B.Sc. Informatics UNS (GPA 3.77)
-            </p>
-            <div class="cyber-hero-actions">
-              <button type="button" v-magnetic="0.22" class="cyber-action" @click="go(1)">
-                Trace the signal <ArrowDown :size="18" />
-              </button>
-              <a href="/Mohammad_Al_Furqon_CV.pdf" download class="cyber-secondary">
-                Download résumé <ArrowUpRight :size="14" />
-              </a>
+        <!-- ================================================================== -->
+        <!-- PRE-MOUNTED 7 CHAPTER STAGES (ZERO VDOM PATCHING DURING SCROLL)    -->
+        <!-- ================================================================== -->
+        <div class="cyber-stage-stack" :data-density="density">
+          <!-- 00 / ORIGIN (Left-aligned, framing Origin Monolith on right) -->
+          <section
+            :ref="(el) => setStageEl(0, el)"
+            class="cyber-story-copy is-left"
+            aria-label="Origin details"
+          >
+            <div class="cyber-chapter-eyebrow">
+              <span class="cyber-chapter-number">00</span>
+              <span class="cyber-eyebrow-label">ORIGIN · SIGNAL CORE</span>
+              <span class="eyebrow-rule" />
             </div>
-          </article>
-
-          <!-- 01 / SYSTEMS (Balanced across all 7 production engineering systems!) -->
-          <article v-else-if="active === 1" class="cyber-copy-content">
-            <h2>
-              <span class="mline"><span>Engineered for</span></span>
-              <span class="mline">
-                <span>production<span class="cyber-punctuation">.</span></span>
-              </span>
-            </h2>
-            <p class="cyber-support">
-              Seven engineering deployments across enterprise HR, municipal government, higher-ed
-              accreditation, university infrastructure, manufacturing, and cyber defense.
-            </p>
-
-            <div class="cyber-sys-pills" role="tablist" aria-label="Production systems">
-              <button
-                v-for="(sys, idx) in engineeringSystems"
-                :key="sys.id"
-                type="button"
-                role="tab"
-                :aria-selected="store.activeSystemIndex === idx"
-                :class="{ active: store.activeSystemIndex === idx }"
-                @click="selectSystem(idx)"
-              >
-                {{ sys.code }}
-              </button>
-            </div>
-
-            <div class="cyber-role-stack">
-              <Transition :name="sysDirection > 0 ? 'cy-card-next' : 'cy-card-prev'" mode="out-in">
-                <div :key="currentSystem.id" class="cyber-role-card cyber-sys-card">
-                  <div class="cyber-card-overline">
-                    <span>{{ currentSystem.code }} / {{ currentSystem.domain.toUpperCase() }}</span>
-                    <span>{{ currentSystem.experience.period }}</span>
-                  </div>
-                  <h3>{{ currentSystem.experience.company }}</h3>
-                  <p>{{ currentSystem.experience.role }}</p>
-                  <p class="cyber-sys-summary">{{ currentSystem.summary }}</p>
-                  <div class="cyber-sys-tags">
-                    <span v-for="tag in currentSystem.architecture.slice(0, 4)" :key="tag">
-                      {{ tag }}
-                    </span>
-                  </div>
-                </div>
-              </Transition>
-            </div>
-
-            <div class="cyber-card-navigation">
-              <button type="button" aria-label="Previous system" @click="changeSystem(-1)">
-                <ArrowLeft :size="18" />
-              </button>
-              <span aria-live="polite">
-                {{ String(store.activeSystemIndex + 1).padStart(2, '0') }}
-                <span>/ 0{{ engineeringSystems.length }}</span>
-              </span>
-              <button type="button" aria-label="Next system" @click="changeSystem(1)">
-                <ArrowRight :size="18" />
-              </button>
-              <button
-                type="button"
-                class="cyber-all-roles"
-                @click="openDetails('engineering', store.activeSystemIndex)"
-              >
-                Inspect dossier <ArrowUpRight :size="13" />
-              </button>
-            </div>
-
-            <p class="cyber-bridge">
-              Working systems generate high-dimensional data.<br />
-              <span>Follow the signal into the neural pipeline.</span>
-            </p>
-          </article>
-
-          <!-- 02 / INTELLIGENCE -->
-          <article v-else-if="active === 2" class="cyber-copy-content">
-            <h2>
-              <span class="mline"><span>From dual views</span></span>
-              <span class="mline">
-                <span>to meaning<span class="cyber-punctuation">.</span></span>
-              </span>
-            </h2>
-            <p class="cyber-lead">
-              Pairing visual feature extraction with sequential language generation.
-            </p>
-            <p class="cyber-support">
-              My thesis processes paired frontal and lateral chest X-rays with DenseNet and decodes
-              them into clinical captions via an LSTM—alongside Bangkit Academy ML training and
-              published web-security research with ISHC-RG UNS.
-            </p>
-            <div class="cyber-method">
-              <span>DUAL X-RAY</span>
-              <ArrowRight :size="12" />
-              <span>DENSENET</span>
-              <ArrowRight :size="12" />
-              <span>LSTM</span>
-              <ArrowRight :size="12" />
-              <span>CAPTION</span>
-            </div>
-            <button
-              type="button"
-              v-magnetic="0.22"
-              class="cyber-action"
-              @click="openDetails('research')"
-            >
-              Research &amp; publications <ArrowUpRight :size="18" />
-            </button>
-            <p class="cyber-bridge">
-              Combining multiple angles reveals what one view misses.<br />
-              <span>The same principle connects my engineering domains.</span>
-            </p>
-          </article>
-
-          <!-- 03 / DOMAINS (Balanced across all 4 operational arenas!) -->
-          <article v-else-if="active === 3" class="cyber-copy-content">
-            <h2>
-              <span class="mline"><span>Four arenas.</span></span>
-              <span class="mline">
-                <span>One standard<span class="cyber-punctuation">.</span></span>
-              </span>
-            </h2>
-            <p class="cyber-lead">
-              Software engineering shaped across enterprise, academic, security, and industrial
-              operations.
-            </p>
-            <div class="cyber-location-list">
-              <div
-                v-for="(dom, i) in perspectiveDomains"
-                :key="dom.code"
-                :style="{ '--i': i }"
-                :class="{ active: store.activeDomainIndex === i }"
-                tabindex="0"
-                @mouseenter="store.activeDomainIndex = i"
-                @focus="store.activeDomainIndex = i"
-                @click="store.activeDomainIndex = i"
-              >
-                <span>{{ dom.code }}</span>
-                <p>
-                  {{ dom.name }}
-                  <small>{{ dom.meta }}</small>
-                </p>
+            <article class="cyber-copy-content">
+              <p class="cyber-role-line">
+                Mohammad Al Furqon · Software Engineer &amp; ML Researcher
+              </p>
+              <h1>
+                <span class="mline mword"><span>Follow</span></span>
+                <span class="mline mword"><span>the</span></span>
+                <span class="mline mword">
+                  <span>signal<span class="cyber-punctuation">.</span></span>
+                </span>
+              </h1>
+              <p class="cyber-lead">
+                Enter the production web systems, security architectures, and neural pipelines I
+                build—chained along one continuous 3D signal conduit.
+              </p>
+              <p class="cyber-support">
+                11 Roles · Enterprise HR Tech, Government APIs, National Accreditation, Security
+                Ops &amp; Medical AI · B.Sc. Informatics UNS (GPA 3.77)
+              </p>
+              <div class="cyber-hero-actions">
+                <button type="button" v-magnetic="0.22" class="cyber-action" @click="go(1)">
+                  Trace the signal <ArrowDown :size="18" />
+                </button>
+                <a href="/Mohammad_Al_Furqon_CV.pdf" download class="cyber-secondary">
+                  Download résumé <ArrowUpRight :size="14" />
+                </a>
               </div>
-            </div>
-            <button
-              type="button"
-              v-magnetic="0.22"
-              class="cyber-action"
-              @click="openDetails('about')"
-            >
-              Education &amp; leadership <ArrowUpRight :size="18" />
-            </button>
-            <p class="cyber-bridge">
-              Every arena leaves a verifiable record.<br />
-              <span>The next room holds all 11 career cartridges.</span>
-            </p>
-          </article>
+            </article>
+          </section>
 
-          <!-- 04 / EXPERIENCE (All 11 roles) -->
-          <article v-else-if="active === 4" class="cyber-copy-content">
-            <h2>
-              <span class="mline"><span>Experience,</span></span>
-              <span class="mline">
-                <span>accumulated<span class="cyber-punctuation">.</span></span>
-              </span>
-            </h2>
-            <p class="cyber-support">
-              Cycle through all 11 roles—from Paragon HR Tech, Bontang Government, and LAMPTIP to
-              UPT TIK UNS, Rapixus, Meiwa, and university teaching.
-            </p>
-            <div class="cyber-role-stack">
-              <Transition :name="roleDirection > 0 ? 'cy-card-next' : 'cy-card-prev'" mode="out-in">
-                <div :key="store.activeNodeIndex" class="cyber-role-card">
-                  <div class="cyber-card-overline">
-                    <span>
-                      ARCHIVE / {{ String(store.activeNodeIndex + 1).padStart(2, '0') }} OF
-                      {{ experiences.length }}
-                    </span>
-                    <span>{{ role.period }}</span>
+          <!-- 01 / SYSTEMS (Right-aligned, framing 7-Blade Rack on left) -->
+          <section
+            :ref="(el) => setStageEl(1, el)"
+            class="cyber-story-copy is-right"
+            aria-label="Systems details"
+          >
+            <div class="cyber-chapter-eyebrow">
+              <span class="cyber-chapter-number">01</span>
+              <span class="cyber-eyebrow-label">SYSTEMS · 7 DEPLOYMENTS</span>
+              <span class="eyebrow-rule" />
+            </div>
+            <article class="cyber-copy-content">
+              <h2>
+                <span class="mline"><span>Engineered for</span></span>
+                <span class="mline">
+                  <span>production<span class="cyber-punctuation">.</span></span>
+                </span>
+              </h2>
+              <p class="cyber-support">
+                Seven engineering deployments across enterprise HR, municipal government, higher-ed
+                accreditation, university infrastructure, manufacturing, and cyber defense.
+              </p>
+
+              <div class="cyber-sys-pills" role="tablist" aria-label="Production systems">
+                <button
+                  v-for="(sys, idx) in engineeringSystems"
+                  :key="sys.id"
+                  type="button"
+                  role="tab"
+                  :aria-selected="store.activeSystemIndex === idx"
+                  :class="{ active: store.activeSystemIndex === idx }"
+                  @click="selectSystem(idx)"
+                >
+                  {{ sys.code }}
+                </button>
+              </div>
+
+              <div class="cyber-role-stack">
+                <Transition :name="sysDirection > 0 ? 'cy-card-next' : 'cy-card-prev'" mode="out-in">
+                  <div :key="currentSystem.id" class="cyber-role-card cyber-sys-card">
+                    <div class="cyber-card-overline">
+                      <span>{{ currentSystem.code }} / {{ currentSystem.domain.toUpperCase() }}</span>
+                      <span>{{ currentSystem.experience.period }}</span>
+                    </div>
+                    <h3>{{ currentSystem.experience.company }}</h3>
+                    <p>{{ currentSystem.experience.role }}</p>
+                    <p class="cyber-sys-summary">{{ currentSystem.summary }}</p>
+                    <div class="cyber-sys-tags">
+                      <span v-for="tag in currentSystem.architecture.slice(0, 4)" :key="tag">
+                        {{ tag }}
+                      </span>
+                    </div>
                   </div>
-                  <h3>{{ role.company }}</h3>
-                  <p>{{ role.role }}</p>
-                  <ul>
-                    <li
-                      v-for="(highlight, h) in role.highlights.slice(0, 3)"
-                      :key="highlight"
-                      :style="{ '--i': h }"
-                    >
-                      {{ highlight }}
-                    </li>
-                  </ul>
-                  <p v-if="role.highlights.length > 3" class="cyber-role-more">
-                    +{{ role.highlights.length - 3 }} more in full index view
-                  </p>
-                </div>
-              </Transition>
-            </div>
-            <div class="cyber-card-navigation">
-              <button type="button" aria-label="Previous role" @click="changeRole(-1)">
-                <ArrowLeft :size="18" />
-              </button>
-              <span aria-live="polite">
-                {{ String(store.activeNodeIndex + 1).padStart(2, '0') }}
-                <span>/ {{ experiences.length }}</span>
-              </span>
-              <button type="button" aria-label="Next role" @click="changeRole(1)">
-                <ArrowRight :size="18" />
-              </button>
-              <button type="button" class="cyber-all-roles" @click="readingView">
-                Full career index <ArrowUpRight :size="13" />
-              </button>
-            </div>
-            <p class="cyber-bridge">
-              Eleven roles inform every architectural decision.<br />
-              <span>The next station assembles the technical stack.</span>
-            </p>
-          </article>
+                </Transition>
+              </div>
 
-          <!-- 05 / TOOLKIT -->
-          <article v-else-if="active === 5" class="cyber-copy-content">
-            <h2>
-              <span class="mline"><span>The right tool.</span></span>
-              <span class="mline">
-                <span>For the problem<span class="cyber-punctuation">.</span></span>
-              </span>
-            </h2>
-            <p class="cyber-support">
-              From Vue/React interfaces and Laravel/Node services to relational databases, Docker
-              deployments, TensorFlow pipelines, and CVSS security.
-            </p>
-            <div class="cyber-skill-tabs" aria-label="Skill categories">
-              <button
-                v-for="(item, i) in skills"
-                :key="item.name"
-                type="button"
-                :aria-pressed="store.activeSkillIndex === i"
-                @click="setSkill(i)"
-              >
-                {{ item.name }}
-              </button>
-            </div>
-            <div :key="store.activeSkillIndex" class="cyber-skill-content" aria-live="polite">
-              <span v-for="(item, i) in skill.items" :key="item" :style="{ '--i': i }">
-                {{ item }}
-              </span>
-            </div>
-            <p class="cyber-bridge">
-              Systems, intelligence, domains, experience, and tools.<br />
-              <span>Now the signal docks at the terminal.</span>
-            </p>
-          </article>
+              <div class="cyber-card-navigation">
+                <button type="button" aria-label="Previous system" @click="changeSystem(-1)">
+                  <ArrowLeft :size="18" />
+                </button>
+                <span aria-live="polite">
+                  {{ String(store.activeSystemIndex + 1).padStart(2, '0') }}
+                  <span>/ 0{{ engineeringSystems.length }}</span>
+                </span>
+                <button type="button" aria-label="Next system" @click="changeSystem(1)">
+                  <ArrowRight :size="18" />
+                </button>
+                <button
+                  type="button"
+                  class="cyber-all-roles"
+                  @click="openDetails('engineering', store.activeSystemIndex)"
+                >
+                  Inspect dossier <ArrowUpRight :size="13" />
+                </button>
+              </div>
 
-          <!-- 06 / CHANNEL -->
-          <article v-else class="cyber-copy-content">
-            <h2>
-              <span class="mline"><span>Your idea.</span></span>
-              <span class="mline">
-                <span>Our next system<span class="cyber-punctuation">.</span></span>
-              </span>
-            </h2>
-            <p class="cyber-lead">The signal has arrived. Let’s build something dependable.</p>
-            <p class="cyber-support">
-              Available for software engineering, fullstack architecture, and machine learning
-              roles.
-            </p>
-            <div class="cyber-email-row">
-              <a class="cyber-contact-email" :href="`mailto:${personalInfo.email}`">
-                <span>{{ personalInfo.email }}</span> <ArrowUpRight :size="17" />
-              </a>
-              <button
-                type="button"
-                class="cyber-copy-inline"
-                :aria-label="copied ? 'Email copied' : 'Copy email address'"
-                @click="copyAddress"
-              >
-                <Check v-if="copied" :size="14" />
-                <Copy v-else :size="14" />
-                <span>{{ copied ? 'Copied' : 'Copy' }}</span>
-              </button>
+              <p class="cyber-bridge">
+                Working systems generate high-dimensional data.<br />
+                <span>Follow the signal into the neural pipeline.</span>
+              </p>
+            </article>
+          </section>
+
+          <!-- 02 / INTELLIGENCE (Left-aligned, framing Neural Prism on right) -->
+          <section
+            :ref="(el) => setStageEl(2, el)"
+            class="cyber-story-copy is-left"
+            aria-label="Intelligence details"
+          >
+            <div class="cyber-chapter-eyebrow">
+              <span class="cyber-chapter-number">02</span>
+              <span class="cyber-eyebrow-label">INTELLIGENCE · DENSENET-LSTM</span>
+              <span class="eyebrow-rule" />
             </div>
-            <div class="cyber-contact-actions">
+            <article class="cyber-copy-content">
+              <h2>
+                <span class="mline"><span>From dual views</span></span>
+                <span class="mline">
+                  <span>to meaning<span class="cyber-punctuation">.</span></span>
+                </span>
+              </h2>
+              <p class="cyber-lead">
+                Pairing visual feature extraction with sequential language generation.
+              </p>
+              <p class="cyber-support">
+                My IEEE-published research processes paired frontal and lateral chest X-rays with
+                DenseNet-121 and decodes them into clinical captions via a hierarchical
+                LSTM—alongside Bangkit Academy ML training and ISHC-RG cybersecurity research.
+              </p>
+              <div class="cyber-method">
+                <span>DUAL X-RAY</span>
+                <ArrowRight :size="12" />
+                <span>DENSENET-121</span>
+                <ArrowRight :size="12" />
+                <span>LSTM</span>
+                <ArrowRight :size="12" />
+                <span>REPORT</span>
+              </div>
               <button
                 type="button"
                 v-magnetic="0.22"
                 class="cyber-action"
-                @click="openDetails('contact')"
+                @click="openDetails('research')"
               >
-                Start a conversation <ArrowUpRight :size="17" />
+                Research &amp; publications <ArrowUpRight :size="18" />
               </button>
-              <a
-                :href="`https://${personalInfo.linkedin}`"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="cyber-secondary"
-              >
-                LinkedIn <ArrowUpRight :size="14" />
-              </a>
-              <button type="button" class="cyber-secondary" @click="readingView">
-                Full portfolio index <ArrowUpRight :size="14" />
-              </button>
+              <p class="cyber-bridge">
+                Combining multiple angles reveals what one view misses.<br />
+                <span>The same principle connects my four engineering arenas.</span>
+              </p>
+            </article>
+          </section>
+
+          <!-- 03 / DOMAINS (Right-aligned, framing 4-Arena Nexus on left) -->
+          <section
+            :ref="(el) => setStageEl(3, el)"
+            class="cyber-story-copy is-right"
+            aria-label="Domains details"
+          >
+            <div class="cyber-chapter-eyebrow">
+              <span class="cyber-chapter-number">03</span>
+              <span class="cyber-eyebrow-label">DOMAINS · FOUR ARENAS</span>
+              <span class="eyebrow-rule" />
             </div>
-            <p class="cyber-endnote">
-              MOHAMMAD AL FURQON<br />SOFTWARE ENGINEER / ML RESEARCHER
-            </p>
-          </article>
+            <article class="cyber-copy-content">
+              <h2>
+                <span class="mline"><span>Four arenas.</span></span>
+                <span class="mline">
+                  <span>One standard<span class="cyber-punctuation">.</span></span>
+                </span>
+              </h2>
+              <p class="cyber-lead">
+                Software engineering shaped across enterprise, academic, security, and industrial
+                operations.
+              </p>
+              <div class="cyber-location-list">
+                <div
+                  v-for="(dom, i) in perspectiveDomains"
+                  :key="dom.code"
+                  :style="{ '--i': i }"
+                  :class="{ active: store.activeDomainIndex === i }"
+                  tabindex="0"
+                  @mouseenter="store.activeDomainIndex = i"
+                  @focus="store.activeDomainIndex = i"
+                  @click="store.activeDomainIndex = i"
+                >
+                  <span>{{ dom.code }}</span>
+                  <p>
+                    {{ dom.name }}
+                    <small>{{ dom.meta }}</small>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                v-magnetic="0.22"
+                class="cyber-action"
+                @click="openDetails('about')"
+              >
+                Education &amp; leadership <ArrowUpRight :size="18" />
+              </button>
+              <p class="cyber-bridge">
+                Every arena leaves a verifiable record.<br />
+                <span>The next station opens the 11-role helical vault.</span>
+              </p>
+            </article>
+          </section>
+
+          <!-- 04 / EXPERIENCE (Left-aligned, framing Helical Archive on right) -->
+          <section
+            :ref="(el) => setStageEl(4, el)"
+            class="cyber-story-copy is-left"
+            aria-label="Experience details"
+          >
+            <div class="cyber-chapter-eyebrow">
+              <span class="cyber-chapter-number">04</span>
+              <span class="cyber-eyebrow-label">EXPERIENCE · 11-ROLE ARCHIVE</span>
+              <span class="eyebrow-rule" />
+            </div>
+            <article class="cyber-copy-content">
+              <h2>
+                <span class="mline"><span>Experience,</span></span>
+                <span class="mline">
+                  <span>accumulated<span class="cyber-punctuation">.</span></span>
+                </span>
+              </h2>
+              <p class="cyber-support">
+                Cycle through all 11 roles—from Paragon HR Tech, Bontang Government, and LAMPTIP to
+                UPT TIK UNS, Rapixus, Meiwa, and university teaching.
+              </p>
+              <div class="cyber-role-stack">
+                <Transition :name="roleDirection > 0 ? 'cy-card-next' : 'cy-card-prev'" mode="out-in">
+                  <div :key="store.activeNodeIndex" class="cyber-role-card">
+                    <div class="cyber-card-overline">
+                      <span>
+                        ARCHIVE / {{ String(store.activeNodeIndex + 1).padStart(2, '0') }} OF
+                        {{ experiences.length }}
+                      </span>
+                      <span>{{ role.period }}</span>
+                    </div>
+                    <h3>{{ role.company }}</h3>
+                    <p>{{ role.role }}</p>
+                    <ul>
+                      <li
+                        v-for="(highlight, h) in role.highlights.slice(0, 3)"
+                        :key="highlight"
+                        :style="{ '--i': h }"
+                      >
+                        {{ highlight }}
+                      </li>
+                    </ul>
+                    <p v-if="role.highlights.length > 3" class="cyber-role-more">
+                      +{{ role.highlights.length - 3 }} more in full index view
+                    </p>
+                  </div>
+                </Transition>
+              </div>
+              <div class="cyber-card-navigation">
+                <button type="button" aria-label="Previous role" @click="changeRole(-1)">
+                  <ArrowLeft :size="18" />
+                </button>
+                <span aria-live="polite">
+                  {{ String(store.activeNodeIndex + 1).padStart(2, '0') }}
+                  <span>/ {{ experiences.length }}</span>
+                </span>
+                <button type="button" aria-label="Next role" @click="changeRole(1)">
+                  <ArrowRight :size="18" />
+                </button>
+                <button type="button" class="cyber-all-roles" @click="readingView">
+                  Full career index <ArrowUpRight :size="13" />
+                </button>
+              </div>
+              <p class="cyber-bridge">
+                Eleven roles inform every architectural decision.<br />
+                <span>The next station aligns the 6-cluster gyro matrix.</span>
+              </p>
+            </article>
+          </section>
+
+          <!-- 05 / TOOLKIT (Right-aligned, framing 6-Cluster Gyro Matrix on left) -->
+          <section
+            :ref="(el) => setStageEl(5, el)"
+            class="cyber-story-copy is-right"
+            aria-label="Toolkit details"
+          >
+            <div class="cyber-chapter-eyebrow">
+              <span class="cyber-chapter-number">05</span>
+              <span class="cyber-eyebrow-label">TOOLKIT · 6 CLUSTERS</span>
+              <span class="eyebrow-rule" />
+            </div>
+            <article class="cyber-copy-content">
+              <h2>
+                <span class="mline"><span>The right tool.</span></span>
+                <span class="mline">
+                  <span>For the problem<span class="cyber-punctuation">.</span></span>
+                </span>
+              </h2>
+              <p class="cyber-support">
+                From Vue/React interfaces and Laravel/Node services to relational databases, Docker
+                deployments, TensorFlow pipelines, and CVSS security.
+              </p>
+              <div class="cyber-skill-tabs" aria-label="Skill categories">
+                <button
+                  v-for="(item, i) in skills"
+                  :key="item.name"
+                  type="button"
+                  :aria-pressed="store.activeSkillIndex === i"
+                  @click="setSkill(i)"
+                >
+                  {{ item.name }}
+                </button>
+              </div>
+              <div :key="store.activeSkillIndex" class="cyber-skill-content" aria-live="polite">
+                <span v-for="(item, i) in skill.items" :key="item" :style="{ '--i': i }">
+                  {{ item }}
+                </span>
+              </div>
+              <p class="cyber-bridge">
+                Systems, intelligence, domains, experience, and tools.<br />
+                <span>Now the signal locks into the terminal beacon.</span>
+              </p>
+            </article>
+          </section>
+
+          <!-- 06 / CHANNEL (Centered, framing Direct Uplink Beacon) -->
+          <section
+            :ref="(el) => setStageEl(6, el)"
+            class="cyber-story-copy is-center"
+            aria-label="Channel details"
+          >
+            <div class="cyber-chapter-eyebrow">
+              <span class="cyber-chapter-number">06</span>
+              <span class="cyber-eyebrow-label">CHANNEL · SIGNAL LOCKED</span>
+              <span class="eyebrow-rule" />
+            </div>
+            <article class="cyber-copy-content">
+              <h2>
+                <span class="mline"><span>Your idea.</span></span>
+                <span class="mline">
+                  <span>Our next system<span class="cyber-punctuation">.</span></span>
+                </span>
+              </h2>
+              <p class="cyber-lead">The signal has arrived. Let’s build something dependable.</p>
+              <p class="cyber-support">
+                Available for software engineering, fullstack architecture, and machine learning
+                roles.
+              </p>
+              <div class="cyber-email-row">
+                <a class="cyber-contact-email" :href="`mailto:${personalInfo.email}`">
+                  <span>{{ personalInfo.email }}</span> <ArrowUpRight :size="17" />
+                </a>
+                <button
+                  type="button"
+                  class="cyber-copy-inline"
+                  :aria-label="copied ? 'Email copied' : 'Copy email address'"
+                  @click="copyAddress"
+                >
+                  <Check v-if="copied" :size="14" />
+                  <Copy v-else :size="14" />
+                  <span>{{ copied ? 'Copied' : 'Copy' }}</span>
+                </button>
+              </div>
+              <div class="cyber-contact-actions">
+                <button
+                  type="button"
+                  v-magnetic="0.22"
+                  class="cyber-action"
+                  @click="openDetails('contact')"
+                >
+                  Start a conversation <ArrowUpRight :size="17" />
+                </button>
+                <a
+                  :href="`https://${personalInfo.linkedin}`"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="cyber-secondary"
+                >
+                  LinkedIn <ArrowUpRight :size="14" />
+                </a>
+                <button type="button" class="cyber-secondary" @click="readingView">
+                  Full portfolio index <ArrowUpRight :size="14" />
+                </button>
+              </div>
+              <p class="cyber-endnote">
+                MOHAMMAD AL FURQON<br />SOFTWARE ENGINEER / ML RESEARCHER
+              </p>
+            </article>
+          </section>
         </div>
 
         <div ref="travelEl" class="cyber-travel-caption" aria-hidden="true">
           <span class="travel-dash" />{{ travelText }}<span class="travel-dash" />
         </div>
         <div ref="cueEl" class="cyber-scroll-cue" aria-hidden="true">
-          <span class="cue-track"><span /></span>Scroll
+          <span class="cue-track"><span /></span>Scroll to glide
         </div>
         <aside ref="sceneNoteEl" class="cyber-scene-note" aria-hidden="true">
           <span class="scene-note-cross">+</span>
@@ -881,7 +1012,7 @@ onBeforeUnmount(() => {
             <small>
               {{
                 active === 0
-                  ? 'Scroll to unlatch the processor'
+                  ? 'Scroll to glide along the 3D conduit'
                   : active === 6
                     ? 'Signal locked. Ready to connect.'
                     : CYBER_STOPS[active].next

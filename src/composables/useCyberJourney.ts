@@ -1,29 +1,31 @@
-import { onMounted, onBeforeUnmount, reactive, type Ref } from 'vue'
+import { onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { LAST_POSITION } from '@/utils/cyberStory'
-import { getLenis } from '@/composables/useSmoothScroll'
+import { getLenis, setLenisExternalRaf, stepLenis } from '@/composables/useSmoothScroll'
 
-export const cyberJourney = reactive({
+/**
+ * Plain non-reactive state object updated at display refresh rate (60-144Hz).
+ * Keeping this outside Vue reactivity guarantees zero VDOM dependency triggers per frame.
+ */
+export const cyberJourney = {
   position: 0,
+  velocity: 0,
   scroll: 0,
   unit: 1400,
   start: 0,
-})
+}
 
-const frameListeners = new Set<(position: number) => void>()
+type FrameCallback = (position: number, velocity: number, dt: number, now: number) => void
+const frameListeners = new Set<FrameCallback>()
 
-export function onCyberFrame(cb: (position: number) => void): () => void {
+export function onCyberFrame(cb: FrameCallback): () => void {
   frameListeners.add(cb)
   return () => {
     frameListeners.delete(cb)
   }
 }
 
-let boostTarget: number | null = null
-export function boostJourney(position: number) {
-  boostTarget = position
-}
-function cancelBoost() {
-  boostTarget = null
+export function boostJourney(_position?: number) {
+  // Handled natively by Lenis duration curve & continuous spline damper
 }
 
 export function useCyberJourney(root: Ref<HTMLElement | null>) {
@@ -32,6 +34,7 @@ export function useCyberJourney(root: Ref<HTMLElement | null>) {
   let lastTime = 0
   let initialized = false
   let currentPos = 0
+  let currentVel = 0
 
   const measure = () => {
     if (!root.value) return
@@ -49,58 +52,57 @@ export function useCyberJourney(root: Ref<HTMLElement | null>) {
     const dt = Math.min(0.05, Math.max(0.001, (now - (lastTime || now)) / 1000))
     lastTime = now
 
-    const scrollY = getLenis()?.animatedScroll ?? window.scrollY
+    // Step Lenis in the exact same animation frame before reading scroll position
+    stepLenis(now)
+
+    const lenis = getLenis()
+    const scrollY = lenis ? lenis.animatedScroll : window.scrollY
     const target = Math.max(0, Math.min(LAST_POSITION, (scrollY - cyberJourney.start) / cyberJourney.unit))
     cyberJourney.scroll = scrollY
 
     if (!initialized) {
       currentPos = target
+      currentVel = 0
       initialized = true
     } else {
+      const prevPos = currentPos
       const error = target - currentPos
-      if (Math.abs(error) < 0.00015) {
+      if (Math.abs(error) < 0.00005) {
         currentPos = target
-        boostTarget = null
-      } else if (boostTarget !== null) {
-        const remaining = Math.abs(boostTarget - currentPos)
-        if (remaining < 0.02) boostTarget = null
-        const damp = 1 - Math.exp(-10 * dt)
-        const maxStep = Math.max(1.35, remaining * 0.85) * dt
-        const step = error * damp
-        currentPos += Math.sign(step) * Math.min(Math.abs(step), maxStep)
+        currentVel *= Math.exp(-18 * dt)
       } else {
-        // Critically damped tracking synced with Lenis sub-pixel scroll:
-        // responsive to wheel/touch without double-lag, bounded against tab-restore spikes.
-        const damp = 1 - Math.exp(-15 * dt)
-        const maxStep = 1.8 * dt
-        const step = error * damp
-        currentPos += Math.sign(step) * Math.min(Math.abs(step), maxStep)
+        // When Lenis is active, animatedScroll is already smoothly damped;
+        // apply a lightweight high-frequency polish filter without velocity clamping.
+        const rate = lenis ? 18 : 9.5
+        const alpha = 1 - Math.exp(-rate * dt)
+        currentPos += error * alpha
+        currentPos = Math.max(0, Math.min(LAST_POSITION, currentPos))
+        const rawVel = (currentPos - prevPos) / dt
+        currentVel += (rawVel - currentVel) * (1 - Math.exp(-14 * dt))
       }
-      currentPos = Math.max(0, Math.min(LAST_POSITION, currentPos))
     }
 
     cyberJourney.position = currentPos
-    frameListeners.forEach((fn) => fn(currentPos))
+    cyberJourney.velocity = currentVel
+
+    frameListeners.forEach((fn) => fn(currentPos, currentVel, dt, now))
   }
 
   onMounted(() => {
+    setLenisExternalRaf(true)
     measure()
     resizeObserver = new ResizeObserver(measure)
     if (root.value) resizeObserver.observe(root.value)
     window.addEventListener('resize', measure, { passive: true })
-    window.addEventListener('wheel', cancelBoost, { passive: true })
-    window.addEventListener('touchstart', cancelBoost, { passive: true })
     lastTime = performance.now()
     rafId = requestAnimationFrame(tick)
   })
 
   onBeforeUnmount(() => {
+    setLenisExternalRaf(false)
     cancelAnimationFrame(rafId)
     resizeObserver?.disconnect()
     window.removeEventListener('resize', measure)
-    window.removeEventListener('wheel', cancelBoost)
-    window.removeEventListener('touchstart', cancelBoost)
-    boostTarget = null
   })
 
   return cyberJourney

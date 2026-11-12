@@ -4,11 +4,21 @@ import { useExperienceStore } from '@/stores/experienceStore'
 
 let lenisInstance: Lenis | null = null
 let rafId: number | null = null
+let externalRafDriven = false
 let subscribers = 0
 const scrollListeners = new Set<(scroll: number, velocity: number) => void>()
 
 export function getLenis(): Lenis | null {
   return lenisInstance
+}
+
+/** Allow the 3D master RAF loop to step Lenis in lockstep within the same frame. */
+export function setLenisExternalRaf(enabled: boolean) {
+  externalRafDriven = enabled
+}
+
+export function stepLenis(time: number) {
+  lenisInstance?.raf(time)
 }
 
 export function onSmoothScroll(cb: (scroll: number, velocity: number) => void): () => void {
@@ -30,23 +40,24 @@ export function useSmoothScroll() {
     if (lenisInstance) return
 
     lenisInstance = new Lenis({
-      lerp: 0.08,
+      lerp: 0.085,
       smoothWheel: true,
-      wheelMultiplier: 0.9,
-      touchMultiplier: 1.5,
+      wheelMultiplier: 0.95,
+      touchMultiplier: 1.4,
       syncTouch: false,
       autoRaf: false,
     })
 
     lenisInstance.on('scroll', (e: { scroll: number; velocity: number }) => {
-      store.updateScrollProgress()
       const s = e.scroll ?? window.scrollY
       const v = e.velocity ?? 0
       scrollListeners.forEach((fn) => fn(s, v))
     })
 
     function raf(time: number) {
-      lenisInstance?.raf(time)
+      if (!externalRafDriven) {
+        lenisInstance?.raf(time)
+      }
       rafId = requestAnimationFrame(raf)
     }
 
@@ -65,7 +76,6 @@ export function useSmoothScroll() {
   }
 
   function onNativeScroll() {
-    store.updateScrollProgress()
     if (!lenisInstance) {
       scrollListeners.forEach((fn) => fn(window.scrollY, 0))
     }
@@ -75,15 +85,15 @@ export function useSmoothScroll() {
     if (lenisInstance) {
       lenisInstance.scrollTo(target, {
         offset: options?.offset ?? 0,
-        duration: options?.duration ?? 1.15,
+        duration: options?.duration ?? 1.2,
       })
     } else if (typeof target === 'number') {
-      window.scrollTo({ top: target, behavior: 'auto' })
+      window.scrollTo({ top: target, behavior: 'smooth' })
     } else {
       const el = typeof target === 'string' ? document.querySelector(target) : target
       if (el) {
         const y = el.getBoundingClientRect().top + window.scrollY + (options?.offset ?? 0)
-        window.scrollTo({ top: y, behavior: 'auto' })
+        window.scrollTo({ top: y, behavior: 'smooth' })
       }
     }
   }
