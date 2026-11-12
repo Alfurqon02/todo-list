@@ -92,7 +92,7 @@ export const experiences: Experience[] = [
       'Handle various websites for diverse companies and individuals',
       'Manage all requested features from clients and implement into production',
       'Utilize various programming languages based on client requirements',
-      'Ensure security, optimization, and seamless deployment of all projects',
+      'Ensure security, performance optimization, and reliable production deployment',
     ],
     tags: ['Freelance', 'Fullstack', 'Multi-language'],
   },

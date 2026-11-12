@@ -5,118 +5,167 @@ import ts from 'typescript'
 
 const source = readFileSync(new URL('../src/utils/cyberStory.ts', import.meta.url), 'utf8')
 const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext } })
-const {
-  CYBER_STOPS,
-  flightAt,
-  storyCopyAt,
-  stagePoseAt,
-  splineProgressAt,
-  stationProximityAt,
-  LAST_POSITION,
-  CHAPTER_SCROLL_VH,
-  engineeringAssemblyAt,
-  advanceJourney,
-  MAX_JOURNEY_SPEED,
-  MAX_JOURNEY_BOOST,
-  cameraDepthAt,
-  signalPointAt,
-  detailScrollableAt,
-} = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`)
+const { CYBER_STOPS, flightAt, storyCopyAt, LAST_POSITION, CHAPTER_SCROLL_VH, centerFollowAt, engineeringAssemblyAt, advanceJourney, MAX_JOURNEY_SPEED, MAX_JOURNEY_BOOST, cameraDepthAt, signalPointAt, detailScrollableAt } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`)
 
-test('every chapter has full station focus at integer stops and travels deeper along Z', () => {
+test('every chapter has a readable dwell and travels deeper into the same world', () => {
   CYBER_STOPS.forEach((stop, i) => {
     assert.equal(storyCopyAt(i).index, i)
     assert.equal(storyCopyAt(i).opacity, 1)
-    assert.equal(stagePoseAt(i, i).opacity, 1)
-    assert.equal(stagePoseAt(i, i).y, 0)
-    assert.equal(stationProximityAt(i, i), 1)
+    assert.equal(storyCopyAt(i + 0.2).opacity, 1)
+    assert.equal(flightAt(i + 0.2).travel, 0)
     if (i) assert.ok(stop.z < CYBER_STOPS[i - 1].z)
     for (const value of [...stop.position, ...stop.target]) assert.ok(Number.isFinite(value))
   })
 })
 
-test('spline progress is strictly monotonic with zero dead scroll zones and C2 boundary continuity', () => {
-  const step = 0.001
-  let prev = splineProgressAt(0)
-  assert.equal(prev, 0)
-  for (let p = step; p <= LAST_POSITION; p += step) {
-    const curr = splineProgressAt(p)
-    const slope = ((curr - prev) * LAST_POSITION) / step
-    // Never freezes (slope >= 0.29 everywhere) and never spikes above 1.71
-    assert.ok(slope > 0.28 && slope < 1.72, `Unexpected slope at ${p}: ${slope}`)
-    const viewportSpeed = slope / (CHAPTER_SCROLL_VH / 100)
-    assert.ok(viewportSpeed > 0 && viewportSpeed < 1, `Too abrupt at ${p}: ${viewportSpeed}`)
-    prev = curr
-  }
-  assert.ok(Math.abs(splineProgressAt(LAST_POSITION) - 1) < 1e-9)
-})
-
-test('pre-mounted stage cards hand off smoothly across midpoint without jumps', () => {
-  for (let i = 0; i < CYBER_STOPS.length - 1; i++) {
-    const mid = i + 0.5
-    const outgoing = stagePoseAt(mid, i)
-    const incoming = stagePoseAt(mid, i + 1)
-    assert.ok(outgoing.visible && incoming.visible)
-    assert.ok(Math.abs(outgoing.opacity - incoming.opacity) < 1e-6)
-    assert.ok(outgoing.y < 0 && incoming.y > 0)
+test('copy hands off without a visibility jump at chapter boundaries', () => {
+  for (let i = 1; i < CYBER_STOPS.length; i++) {
+    const before = storyCopyAt(i - 0.000001)
+    const after = storyCopyAt(i)
+    assert.equal(before.index, after.index)
+    assert.ok(Math.abs(before.opacity - after.opacity) < 0.00001)
+    assert.ok(flightAt(i - 0.000001).travel > 0.99999)
   }
 })
 
-test('the final contact chapter stays locked at the end of the conduit', () => {
+test('camera flights are reversible and hide departing copy during the close pass', () => {
+  for (let i = 0; i < 6; i++) {
+    const forward = [0.44, 0.6, 0.72, 0.85, 0.999].map((p) => flightAt(i + p).travel)
+    const backward = [0.999, 0.85, 0.72, 0.6, 0.44].map((p) => flightAt(i + p).travel)
+    assert.deepEqual(forward, backward.toReversed())
+    assert.ok(forward.every((p, n) => n === 0 || p >= forward[n - 1]))
+    assert.equal(storyCopyAt(i + 0.65).opacity, 0)
+  }
+})
+
+test('the final contact chapter stays available at the bottom of the document', () => {
   assert.deepEqual(storyCopyAt(LAST_POSITION), { index: 6, opacity: 1, entering: false })
   assert.equal(flightAt(LAST_POSITION).travel, 0)
 })
 
-test('engineering station unfolds smoothly around chapter 1 and retracts cleanly', () => {
-  assert.deepEqual(engineeringAssemblyAt(0, 0), { lid: 0, layer: 0 })
-  assert.equal(engineeringAssemblyAt(1, 0).lid, 1)
-  assert.equal(engineeringAssemblyAt(1, 0).layer, 1)
-  assert.ok(engineeringAssemblyAt(0.5, 0).layer >= engineeringAssemblyAt(0.5, 2).layer)
-  assert.deepEqual(engineeringAssemblyAt(2.3, 2), { lid: 0, layer: 0 })
+test('camera pacing stays below one complete flight per viewport of scrolling', () => {
+  const step = 0.0001
+  for (let p = 0; p < 0.999; p += 0.001) {
+    const speed = (flightAt(p + step).travel - flightAt(p).travel) / step / (CHAPTER_SCROLL_VH / 100)
+    assert.ok(speed >= 0 && speed < 1, `Too abrupt at ${p}: ${speed}`)
+  }
+  assert.ok(storyCopyAt(0.9).opacity > 0.4)
+  assert.ok(flightAt(0.9).travel > 0.9)
 })
+
+
+test('transitions lock onto the center lane and release smoothly at chapter views', () => {
+  assert.equal(centerFollowAt(0), 0)
+  assert.equal(centerFollowAt(1), 0)
+  for (const t of [0.2, 0.35, 0.5, 0.65, 0.8]) assert.equal(centerFollowAt(t), 1)
+  for (let t = 0; t <= 1; t += 0.01) {
+    assert.ok(Math.abs(centerFollowAt(t) - centerFollowAt(1 - t)) < 1e-10)
+  }
+  assert.ok(centerFollowAt(0.0001) < 1e-8)
+  assert.ok(centerFollowAt(0.9999) < 1e-8)
+})
+
+
+test('engineering opens lid before boards and retracts without overshoot', () => {
+  assert.deepEqual(engineeringAssemblyAt(0.7, 0), { lid: 0, layer: 0 })
+  assert.ok(engineeringAssemblyAt(0.95, 0).lid > engineeringAssemblyAt(0.95, 0).layer)
+  assert.ok(engineeringAssemblyAt(1.1, 0).layer > engineeringAssemblyAt(1.1, 2).layer)
+  for (let p = 0; p < 2; p += 0.005) {
+    for (let i = 0; i < 3; i++) {
+      const pose = engineeringAssemblyAt(p, i)
+      assert.ok(pose.lid >= -1e-10 && pose.lid <= 1 + 1e-10)
+      assert.ok(pose.layer >= -1e-10 && pose.layer <= 1 + 1e-10)
+    }
+  }
+  assert.deepEqual(engineeringAssemblyAt(1.9, 2), { lid: 0, layer: 0 })
+})
+
+
+test('large scroll jumps and resumed frames cannot teleport the scene', () => {
+  for (const fps of [30, 60, 144]) {
+    let state = { position: 0, velocity: 0 }
+    for (let frame = 0; frame < fps * 23; frame++) {
+      const previous = state.position
+      state = advanceJourney(state.position, state.velocity, 6, 1 / fps)
+      assert.ok(state.position >= previous)
+      assert.ok(state.position - previous <= MAX_JOURNEY_SPEED / fps + 1e-10)
+    }
+    assert.ok(Math.abs(state.position - 6) < 0.001)
+    const resumed = advanceJourney(state.position, state.velocity, 0, 15)
+    assert.ok(Math.abs(resumed.position - state.position) <= MAX_JOURNEY_SPEED / 30)
+  }
+})
+
+test('reversing input brakes before changing camera direction', () => {
+  let state = { position: 3, velocity: MAX_JOURNEY_SPEED }
+  const first = advanceJourney(state.position, state.velocity, 0, 1 / 60)
+  assert.ok(first.velocity > 0)
+  assert.ok(first.velocity < state.velocity)
+  for (let frame = 0; frame < 90; frame++) state = advanceJourney(state.position, state.velocity, 0, 1 / 60)
+  assert.ok(state.velocity < 0)
+  assert.ok(state.position < 3)
+})
+
 
 test('camera never backtracks during forward scroll on desktop or portrait', () => {
   for (const portrait of [false, true]) {
     let previous = cameraDepthAt(0, portrait)
-    for (let p = 0.002; p <= LAST_POSITION; p += 0.002) {
+    for (let p = 0.001; p <= LAST_POSITION; p += 0.001) {
       const depth = cameraDepthAt(p, portrait)
-      assert.ok(depth < previous, `Camera did not advance at ${p}`)
+      assert.ok(depth <= previous + 1e-10, `Backtrack at ${p}`)
       previous = depth
     }
-  }
-})
-
-test('signal core advances continuously down the conduit without backtracking', () => {
-  let previousZ = 0
-  for (let t = 0; t <= 1; t += 0.002) {
-    const [x, y, z] = signalPointAt(t)
-    assert.ok(Number.isFinite(x) && Number.isFinite(y))
-    assert.ok(z <= previousZ)
-    previousZ = z
-  }
-})
-
-test('detail scroll is available when settled near any chapter station', () => {
-  for (let chapter = 0; chapter <= LAST_POSITION; chapter++) {
-    assert.equal(detailScrollableAt(chapter), true)
-    assert.equal(detailScrollableAt(chapter + 0.2), true)
-    if (chapter < LAST_POSITION) {
-      assert.equal(detailScrollableAt(chapter + 0.5), false)
+    for (let chapter = 0; chapter < 6; chapter++) {
+      assert.equal(cameraDepthAt(chapter, portrait), cameraDepthAt(chapter + 0.3, portrait))
     }
   }
 })
 
-test('advanceJourney remains bounded and reverses smoothly without teleporting', () => {
-  let state = { position: 0, velocity: 0 }
-  for (let frame = 0; frame < 60 * 12; frame++) {
-    const prev = state.position
-    state = advanceJourney(state.position, state.velocity, 6, 1 / 60, MAX_JOURNEY_BOOST)
-    assert.ok(state.position >= prev)
-    assert.ok(state.position - prev <= MAX_JOURNEY_BOOST / 60 + 1e-10)
+test('signal clears the processor, floor and terminal with room for its full body', () => {
+  const bodyRadius = 0.4
+  let previous = 0
+  for (let t = 0; t <= 1; t += 0.001) {
+    const [x, y, z] = signalPointAt(t)
+    assert.equal(x, 0)
+    assert.ok(z <= previous)
+    assert.ok(y - bodyRadius > -1.53)
+    if (z > -4.1) assert.ok(y - bodyRadius > 0.32)
+    assert.ok(z - bodyRadius > -110.75)
+    previous = z
   }
-  assert.ok(Math.abs(state.position - 6) < 0.001)
+})
 
-  let rev = { position: 3, velocity: MAX_JOURNEY_SPEED }
-  const first = advanceJourney(rev.position, rev.velocity, 0, 1 / 60)
-  assert.ok(first.velocity < rev.velocity)
+
+test('detail scroll is available only after full chapter arrival', () => {
+  for (let chapter = 0; chapter < 6; chapter++) {
+    assert.equal(detailScrollableAt(chapter), true)
+    assert.equal(detailScrollableAt(chapter + 0.2), true)
+    for (const offset of [0.34, 0.5, 0.8, 0.9, 0.99]) assert.equal(detailScrollableAt(chapter + offset), false)
+    assert.equal(detailScrollableAt(chapter + 0.99999), true)
+    assert.equal(detailScrollableAt(chapter + 1), true)
+  }
+  assert.equal(detailScrollableAt(LAST_POSITION), true)
+})
+
+
+test('navigation boost flies faster but stays bounded and never teleports', () => {
+  let state = { position: 0, velocity: 0 }
+  let frames = 0
+  while (Math.abs(state.position - 6) > 0.001 && frames < 60 * 30) {
+    const previous = state.position
+    state = advanceJourney(state.position, state.velocity, 6, 1 / 60, MAX_JOURNEY_BOOST)
+    assert.ok(state.position - previous <= MAX_JOURNEY_BOOST / 60 + 1e-10)
+    frames++
+  }
+  assert.ok(frames / 60 < 9, `Boosted jump too slow: ${frames / 60}s`)
+  // An out-of-range request is clamped to the boost ceiling.
+  let capped = { position: 0, velocity: 0 }
+  for (let f = 0; f < 600; f++) {
+    const previous = capped.position
+    capped = advanceJourney(capped.position, capped.velocity, 6, 1 / 60, 50)
+    assert.ok(capped.position - previous <= MAX_JOURNEY_BOOST / 60 + 1e-10)
+  }
+  // Without a boost the default bound is unchanged.
+  const normal = advanceJourney(0, MAX_JOURNEY_SPEED, 6, 1 / 60)
+  assert.ok(normal.position <= MAX_JOURNEY_SPEED / 60 + 1e-10)
 })

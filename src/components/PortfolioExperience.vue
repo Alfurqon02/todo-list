@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import {
-  ArrowUpRight,
   ArrowDown,
   ArrowUp,
   Plus,
@@ -275,7 +274,7 @@ onBeforeUnmount(() => {
 
     <header class="site-header" :class="{ 'has-scrolled': hasScrolled, 'is-hidden': headerHidden }">
       <a class="cyber-brand" href="#hero" @click.prevent="navigate('hero')">
-        <span class="brand-emblem" aria-hidden="true">F<span>↗</span></span>
+        <span class="brand-emblem" aria-hidden="true">F</span>
         <span>AL FURQON<small>SOFTWARE / INTELLIGENCE</small></span>
       </a>
 
@@ -306,7 +305,7 @@ onBeforeUnmount(() => {
           <span>3D Chained Journey</span>
         </button>
         <a v-magnetic="0.18" href="/Mohammad_Al_Furqon_CV.pdf" class="resume-link" download>
-          <span>Résumé</span> <ArrowUpRight :size="14" />
+          <span>Résumé</span>
         </a>
         <button
           type="button"
@@ -333,10 +332,10 @@ onBeforeUnmount(() => {
           :href="`#${s.id}`"
           @click.prevent="navigate(s.id)"
         >
-          <span>{{ s.num }}</span> {{ s.label }} <ArrowUpRight :size="16" />
+          <span>{{ s.num }}</span> {{ s.label }}
         </a>
         <button type="button" class="mobile-3d-btn" @click="open3DJourney">
-          Launch 3D Chained Journey <ArrowUpRight :size="16" />
+          Launch 3D Chained Journey
         </button>
       </nav>
     </Transition>
@@ -361,7 +360,7 @@ onBeforeUnmount(() => {
             </p>
             <div class="hero-actions">
               <button type="button" v-magnetic="0.2" class="cyber-action" @click="open3DJourney">
-                Enter 3D Chained Journey <ArrowUpRight :size="17" />
+                Enter 3D Chained Journey
               </button>
               <a class="cyber-secondary" href="#work" @click.prevent="navigate('work')">
                 Explore 7 production systems <ArrowDown :size="15" />
@@ -454,7 +453,6 @@ onBeforeUnmount(() => {
             </div>
             <button type="button" class="sys-inspect-btn" @click="showSystem(sys)">
               <span>Inspect system dossier</span>
-              <ArrowUpRight :size="15" />
             </button>
           </article>
         </div>
@@ -501,7 +499,7 @@ onBeforeUnmount(() => {
             </div>
 
             <button type="button" class="cyber-action" @click="showResearch">
-              Open full research specification <ArrowUpRight :size="16" />
+              Open full research specification
             </button>
           </div>
 
@@ -512,7 +510,7 @@ onBeforeUnmount(() => {
             </article>
             <article class="pub-card">
               <span class="sys-code">ML COHORT · {{ organizations[3].period.toUpperCase() }}</span>
-              <h3>{{ organizations[3].name }} — {{ organizations[3].role }}</h3>
+              <h3>{{ organizations[3].name }} · {{ organizations[3].role }}</h3>
               <p>{{ organizations[3].description }}</p>
             </article>
           </div>
@@ -757,7 +755,7 @@ onBeforeUnmount(() => {
               target="_blank"
               rel="noopener noreferrer"
             >
-              LinkedIn <ArrowUpRight :size="15" />
+              LinkedIn
             </a>
             <button
               type="button"
@@ -799,7 +797,7 @@ onBeforeUnmount(() => {
               <div class="composer-actions">
                 <p>Opens your email client with this note pre-filled.</p>
                 <button v-magnetic="0.15" type="submit" class="cyber-action">
-                  Continue to email <ArrowUpRight :size="16" />
+                  Continue to email
                 </button>
               </div>
             </form>
@@ -809,7 +807,7 @@ onBeforeUnmount(() => {
         <footer class="site-footer">
           <span>© {{ new Date().getFullYear() }} Mohammad Al Furqon</span>
           <button type="button" class="cyber-secondary" @click="open3DJourney">
-            Launch 3D Chained Journey <ArrowUpRight :size="14" />
+            Launch 3D Chained Journey
           </button>
           <a class="back-to-top" href="#hero" @click.prevent="navigate('hero')">
             Back to top <ArrowUp :size="14" />

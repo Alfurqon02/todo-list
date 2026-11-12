@@ -4,7 +4,7 @@
   --cy-card: #0b1c29b3;
   --cy-text: #eaf3f9;
   --cy-muted: #9caebc;
-  --cy-dim: #728594;
+  --cy-dim: #869cac;
   --cy-accent: #45d7ff;
   --cy-amber: #ffa65c;
   --cy-line: #87c9ee2b;
@@ -18,7 +18,7 @@
   --cy-card: #f8fbfcea;
   --cy-text: #102534;
   --cy-muted: #395463;
-  --cy-dim: #536d7b;
+  --cy-dim: #486270;
   --cy-accent: #006c87;
   --cy-amber: #b35912;
   --cy-line: #36566a2e;
@@ -331,7 +331,7 @@ body:has(dialog[open]) {
   align-items: center;
   gap: 16px;
   padding: 14px 18px;
-  border-left: 2px solid var(--cy-accent);
+  border: 1px solid var(--cy-line);
   background: color-mix(in srgb, var(--cy-surface) 75%, transparent);
   font: 12px var(--cy-mono);
   color: var(--cy-muted);

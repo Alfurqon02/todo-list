@@ -1,710 +1,434 @@
 import * as THREE from 'three'
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import { experiences, skills } from '@/data/portfolioData'
-import { engineeringSystems, perspectiveDomains } from '@/data/portfolioEditorial'
 import { signalPointAt } from '@/utils/cyberStory'
 
-function makeLabelTexture(
-  title: string,
-  sub = '',
-  accent = '#45d7ff',
-  dark = true,
-): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas')
-  canvas.width = 512
-  canvas.height = 160
-  const ctx = canvas.getContext('2d')!
-
-  ctx.fillStyle = dark ? 'rgba(6, 13, 22, 0.88)' : 'rgba(232, 240, 245, 0.92)'
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-  ctx.strokeStyle = accent
-  ctx.lineWidth = 3
-  ctx.strokeRect(4, 4, canvas.width - 8, canvas.height - 8)
-
-  ctx.fillStyle = accent
-  ctx.fillRect(18, 22, 6, canvas.height - 44)
-
-  ctx.font = '700 28px "JetBrains Mono", monospace'
-  ctx.fillStyle = dark ? '#eef7ff' : '#0b1824'
-  ctx.fillText(title.slice(0, 26), 40, sub ? 70 : 90)
-
-  if (sub) {
-    ctx.font = '500 19px "JetBrains Mono", monospace'
-    ctx.fillStyle = accent
-    ctx.fillText(sub.slice(0, 34), 40, 114)
-  }
-
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  texture.anisotropy = 4
-  return texture
-}
-
+/** A continuous, explorable machine where every station is chained along a single signal bus. */
 export function buildCyberWorld() {
   const group = new THREE.Group()
-  const geometries: THREE.BufferGeometry[] = []
-  const materials: THREE.Material[] = []
+  const shellPanels: THREE.Group[] = []
+  const inputFrames: THREE.Group[] = []
+  const neuralLayers: THREE.Group[] = []
+  const mapNodes: THREE.Group[] = []
+  const archiveCards: THREE.Group[] = []
+  const skillRings: THREE.Group[] = []
+  const computeBlades: THREE.Group[] = []
+  const systemPorts: THREE.Mesh[] = []
+  const dataPackets: THREE.Mesh[] = []
   const textures: THREE.Texture[] = []
 
-  const trackGeo = <T extends THREE.BufferGeometry>(g: T): T => {
-    geometries.push(g)
-    return g
-  }
-  const trackMat = <T extends THREE.Material>(m: T): T => {
-    materials.push(m)
-    return m
-  }
-  const trackTex = <T extends THREE.Texture>(t: T): T => {
-    textures.push(t)
-    return t
+  const metal = new THREE.MeshStandardMaterial({ color: 0x223843, roughness: 0.32, metalness: 0.8 })
+  const dark = new THREE.MeshStandardMaterial({ color: 0x08121b, roughness: 0.42, metalness: 0.65 })
+  const ceramic = new THREE.MeshStandardMaterial({ color: 0x79919d, roughness: 0.3, metalness: 0.55 })
+  const cyan = new THREE.MeshBasicMaterial({ color: 0x38d9ff, toneMapped: false })
+  const amber = new THREE.MeshBasicMaterial({ color: 0xffa65c, toneMapped: false })
+  const glass = new THREE.MeshPhysicalMaterial({
+    color: 0x1a6076,
+    metalness: 0.5,
+    roughness: 0.15,
+    transparent: true,
+    opacity: 0.22,
+    depthWrite: false,
+  })
+
+  const unitBox = new THREE.BoxGeometry(1, 1, 1)
+  const rounded = new RoundedBoxGeometry(1, 1, 1, 1, 0.06)
+
+  type Box = { p: number[]; s: number[] }
+  const batches = new Map<THREE.Material, Box[]>()
+
+  const box = (mat: THREE.Material, p: number[], s: number[]) => {
+    const list = batches.get(mat) ?? []
+    list.push({ p, s })
+    batches.set(mat, list)
   }
 
-  // Shared Igloo.inc-inspired Crystalline & Brushed Titanium Materials
-  const darkTitanium = trackMat(
-    new THREE.MeshStandardMaterial({
-      color: 0x0d1724,
-      metalness: 0.86,
-      roughness: 0.24,
-    }),
-  )
-  const brushedAlloy = trackMat(
-    new THREE.MeshStandardMaterial({
-      color: 0x1a2c40,
-      metalness: 0.78,
-      roughness: 0.3,
-    }),
-  )
-  const crystalShellMat = trackMat(
-    new THREE.MeshPhysicalMaterial({
-      color: 0x8be4ff,
-      emissive: 0x0b2c44,
-      emissiveIntensity: 0.55,
-      metalness: 0.15,
-      roughness: 0.12,
-      transmission: 0.55,
-      transparent: true,
-      opacity: 0.76,
-      ior: 1.45,
-    }),
-  )
-  const crystalWireMat = trackMat(
-    new THREE.MeshBasicMaterial({
-      color: 0x45d7ff,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.32,
-    }),
-  )
-  const cyanEmissive = trackMat(
-    new THREE.MeshStandardMaterial({
-      color: 0x45d7ff,
-      emissive: 0x22b8eb,
-      emissiveIntensity: 1.45,
-      metalness: 0.2,
-      roughness: 0.2,
-    }),
-  )
-  const amberEmissive = trackMat(
-    new THREE.MeshStandardMaterial({
-      color: 0xffa65c,
-      emissive: 0xff8a30,
-      emissiveIntensity: 1.35,
-      metalness: 0.2,
-      roughness: 0.2,
-    }),
-  )
-  const dimPortMat = trackMat(
-    new THREE.MeshStandardMaterial({
-      color: 0x1e3448,
-      emissive: 0x0c2233,
-      emissiveIntensity: 0.35,
-      metalness: 0.5,
-      roughness: 0.35,
-    }),
-  )
-  const gridLineMat = trackMat(
-    new THREE.LineBasicMaterial({
-      color: 0x1e4968,
-      transparent: true,
-      opacity: 0.26,
-    }),
-  )
-
-  const addBadge = (
-    parent: THREE.Object3D,
-    title: string,
-    sub: string,
-    pos: [number, number, number],
-    size: [number, number] = [2.4, 0.75],
-    accent = '#45d7ff',
-    rotY = 0,
-  ) => {
-    const tex = trackTex(makeLabelTexture(title, sub, accent))
-    const mat = trackMat(
-      new THREE.MeshBasicMaterial({
-        map: tex,
-        transparent: true,
-        side: THREE.DoubleSide,
-      }),
-    )
-    const mesh = new THREE.Mesh(trackGeo(new THREE.PlaneGeometry(size[0], size[1])), mat)
-    mesh.position.set(...pos)
-    mesh.rotation.y = rotY
+  const movingBox = (parent: THREE.Group, mat: THREE.Material, p: number[], s: number[], round = false) => {
+    const mesh = new THREE.Mesh(round ? rounded : unitBox, mat)
+    mesh.position.set(p[0], p[1], p[2])
+    mesh.scale.set(s[0], s[1], s[2])
     parent.add(mesh)
     return mesh
   }
 
-  // ============================================================================
-  // 1. ARCHITECTURAL FLOOR GRID & VOLUMETRIC PARTICLE FIELD
-  // ============================================================================
-  const floorPoints: THREE.Vector3[] = []
-  for (let z = 12; z >= -120; z -= 3) {
-    floorPoints.push(new THREE.Vector3(-18, -1.6, z), new THREE.Vector3(18, -1.6, z))
+  const lines: number[] = []
+  const line = (...points: number[][]) => {
+    for (let i = 0; i < points.length - 1; i++) lines.push(...points[i], ...points[i + 1])
   }
-  for (let x = -18; x <= 18; x += 3) {
-    floorPoints.push(new THREE.Vector3(x, -1.6, 12), new THREE.Vector3(x, -1.6, -120))
-  }
-  const floorGrid = new THREE.LineSegments(
-    trackGeo(new THREE.BufferGeometry().setFromPoints(floorPoints)),
-    gridLineMat,
-  )
-  group.add(floorGrid)
 
-  // Volumetric 3D particle dust for continuous depth perception during scroll
-  const particleCount = 1050
-  const particlePositions = new Float32Array(particleCount * 3)
-  const particleColors = new Float32Array(particleCount * 3)
-  const cCyan = new THREE.Color(0x45d7ff)
-  const cAmber = new THREE.Color(0xffa65c)
-  for (let i = 0; i < particleCount; i++) {
-    const i3 = i * 3
-    particlePositions[i3] = (Math.random() - 0.5) * 30
-    particlePositions[i3 + 1] = -1.2 + Math.random() * 11
-    particlePositions[i3 + 2] = 14 - Math.random() * 132
-    const c = i % 5 === 0 ? cAmber : cCyan
-    particleColors[i3] = c.r
-    particleColors[i3 + 1] = c.g
-    particleColors[i3 + 2] = c.b
+  function label(parent: THREE.Group, title: string, subtitle: string, p: number[], w = 2.5, h = 0.68) {
+    const canvas = document.createElement('canvas')
+    canvas.width = 768
+    canvas.height = 192
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = '#07151f'
+    ctx.fillRect(0, 0, 768, 192)
+    ctx.fillStyle = '#40d8ff'
+    ctx.fillRect(0, 0, 5, 192)
+    ctx.font = '600 32px "JetBrains Mono", monospace'
+    ctx.fillText(title.toUpperCase().slice(0, 34), 30, 73)
+    ctx.fillStyle = '#9bb4c2'
+    ctx.font = '500 24px "JetBrains Mono", monospace'
+    ctx.fillText(subtitle.slice(0, 44), 30, 135)
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.colorSpace = THREE.SRGBColorSpace
+    textures.push(texture)
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }),
+    )
+    mesh.position.set(p[0], p[1], p[2])
+    parent.add(mesh)
+    return mesh
   }
-  const particleGeo = trackGeo(new THREE.BufferGeometry())
-  particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3))
-  particleGeo.setAttribute('color', new THREE.BufferAttribute(particleColors, 3))
-  const particleMat = trackMat(
-    new THREE.PointsMaterial({
-      size: 0.085,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.65,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    }),
-  )
-  const particleField = new THREE.Points(particleGeo, particleMat)
-  group.add(particleField)
 
-  // ============================================================================
-  // 2. CONTINUOUS QUANTUM SIGNAL CONDUIT & TRAVELLING CRYSTALLINE CORE
-  // ============================================================================
-  const pathPoints = Array.from({ length: 65 }, (_, i) => {
-    const [x, y, z] = signalPointAt(i / 64)
-    return new THREE.Vector3(x, y, z)
+  // Continuous foundation connecting all 7 stations along the z-axis.
+  for (let z = 2; z > -119; z -= 4) {
+    box(dark, [0, -1.75, z], [10, 0.38, 3.94])
+    box(metal, [-4.8, -1.42, z], [0.16, 0.28, 3.88])
+    box(metal, [4.8, -1.42, z], [0.16, 0.28, 3.88])
+    line([-4.5, -1.535, z + 1.9], [-4.5, -1.535, z - 1.9])
+    line([4.5, -1.535, z + 1.9], [4.5, -1.535, z - 1.9])
+    for (const x of [-3.9, 3.9]) box(ceramic, [x, -1.52, z + 1.3], [0.16, 0.05, 0.16])
+  }
+
+  // 00. ORIGIN: Central processor housing whose four quadrants physically unlatch and open.
+  box(metal, [0, -1.25, 0], [7.1, 0.55, 7.1])
+  box(ceramic, [0, -0.92, 0], [5.7, 0.15, 5.7])
+  box(dark, [0, -0.69, 0], [3.1, 0.3, 3.1])
+  box(cyan, [0, -0.51, 0], [2.75, 0.025, 2.75])
+  box(dark, [0, -0.48, 0], [2.5, 0.08, 2.5])
+  const coreLabel = label(group, 'AL FURQON', 'SOFTWARE / INTELLIGENCE', [0, -0.425, 0], 2.35, 0.7)
+  coreLabel.rotation.x = -Math.PI / 2
+
+  for (const x of [-1, 1]) {
+    for (const z of [-1, 1]) {
+      const panel = new THREE.Group()
+      panel.position.set(x * 1.88, 0.1, z * 1.88)
+      panel.userData.direction = [x, z]
+      movingBox(panel, metal, [0, 0, 0], [3.42, 0.44, 3.42], true)
+      movingBox(panel, dark, [0, 0.235, 0], [2.83, 0.035, 2.83])
+      movingBox(panel, ceramic, [-0.87, 0.29, 0], [0.18, 0.07, 2.3])
+      for (let i = 0; i < 6; i++) movingBox(panel, dark, [0.1 + i * 0.19, 0.29, 0], [0.09, 0.08, 2.15])
+      movingBox(panel, cyan, [0, 0.24, z * 1.48], [2.3, 0.035, 0.025])
+      group.add(panel)
+      shellPanels.push(panel)
+    }
+  }
+
+  for (let i = 0; i < 22; i++) {
+    const t = -2.8 + i * 0.267
+    for (const sign of [-1, 1]) {
+      box(ceramic, [sign * 3.6, -0.99, t], [0.52, 0.13, 0.105])
+      box(ceramic, [t, -0.99, sign * 3.6], [0.105, 0.13, 0.52])
+      line([sign * 3.6, -1.53, t], [sign * 4.3, -1.53, t], [sign * 4.3, -1.53, -6])
+    }
+  }
+
+  // 01. SYSTEMS: Exploded 3-layer software architecture representing all 7 production systems.
+  const engineering = new THREE.Group()
+  engineering.position.set(-2.65, 0, -16)
+  group.add(engineering)
+
+  const alloy = new THREE.MeshStandardMaterial({ color: 0x8da8b3, metalness: 0.85, roughness: 0.26 })
+  const graphite = new THREE.MeshStandardMaterial({ color: 0x142129, metalness: 0.65, roughness: 0.34 })
+  const boardMaterial = new THREE.MeshStandardMaterial({ color: 0x0c353d, metalness: 0.45, roughness: 0.38 })
+  const copper = new THREE.MeshStandardMaterial({ color: 0xb9814f, metalness: 0.8, roughness: 0.3 })
+
+  function precisionBox(parent: THREE.Group, mat: THREE.Material, pos: number[], size: number[], radius = 0.045) {
+    const mesh = new THREE.Mesh(
+      new RoundedBoxGeometry(size[0], size[1], size[2], 3, Math.min(radius, Math.min(...size) / 3)),
+      mat,
+    )
+    mesh.position.fromArray(pos)
+    parent.add(mesh)
+    return mesh
+  }
+
+  precisionBox(engineering, graphite, [0, -1.23, 0], [3.45, 0.52, 3.9], 0.12)
+  precisionBox(engineering, alloy, [0, -0.94, 0], [3.25, 0.09, 3.65])
+  precisionBox(engineering, cyan, [0, -1.18, 1.958], [2.45, 0.025, 0.018])
+  label(engineering, 'PRODUCTION SYSTEMS', 'ENTERPRISE · GOV · WEB · SECURITY', [0, -1.3, 1.965], 2.85, 0.32)
+
+  for (const x of [-1.48, 1.48]) {
+    for (const z of [-1.65, 1.65]) {
+      precisionBox(engineering, alloy, [x, 0.26, z], [0.065, 2.35, 0.065], 0.015)
+      const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.1, 20), graphite)
+      foot.position.set(x, -1.52, z)
+      engineering.add(foot)
+    }
+  }
+
+  const layerNames = ['DATA & INFRASTRUCTURE', 'AUTH & API SERVICES', 'WEB APPLICATIONS']
+  const layerNotes = ['SCHEMAS · AUDIT · LINUX · CLOUD', 'JWT · RBAC · REST · VANS CVSS', 'HR TECH · GOV · PORTALS · OPS']
+
+  for (let layer = 0; layer < 3; layer++) {
+    const tray = new THREE.Group()
+    tray.position.y = -0.67 + layer * 0.64
+    tray.userData.restY = tray.position.y
+    tray.userData.restZ = 0
+    engineering.add(tray)
+    computeBlades.push(tray)
+
+    precisionBox(tray, graphite, [0, 0, 0], [3.08, 0.16, 3.38])
+    precisionBox(tray, boardMaterial, [0, 0.105, 0], [2.87, 0.055, 3.15])
+    precisionBox(tray, alloy, [-0.25, 0.21, -0.15], [0.95, 0.16, 1.05])
+
+    for (let fin = 0; fin < 9; fin++) {
+      precisionBox(tray, graphite, [-0.65 + fin * 0.1, 0.34, -0.15], [0.045, 0.17, 0.88], 0.01)
+    }
+    for (let ram = 0; ram < 3; ram++) {
+      precisionBox(tray, dark, [0.85, 0.22, -0.85 + ram * 0.66], [0.35, 0.16, 0.48])
+      for (let pin = 0; pin < 5; pin++) {
+        precisionBox(tray, copper, [0.64, 0.17, -1.02 + ram * 0.66 + pin * 0.08], [0.075, 0.025, 0.032], 0.005)
+      }
+    }
+    for (let trace = 0; trace < 6; trace++) {
+      const z = -1.23 + trace * 0.43
+      precisionBox(tray, copper, [-1.05, 0.142, z], [0.45, 0.008, 0.014], 0.002)
+      precisionBox(tray, copper, [-0.83, 0.142, z + 0.08], [0.014, 0.008, 0.17], 0.002)
+    }
+    for (const x of [-1.33, 1.33]) {
+      for (const z of [-1.42, 1.42]) {
+        const screw = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.052, 0.035, 12), alloy)
+        screw.position.set(x, 0.16, z)
+        tray.add(screw)
+      }
+    }
+    precisionBox(tray, alloy, [0, 0.05, 1.72], [3.12, 0.29, 0.08])
+    label(tray, layerNames[layer], layerNotes[layer], [-0.25, 0.06, 1.767], 2.24, 0.23)
+    for (let led = 0; led < 3; led++) {
+      precisionBox(tray, led === 2 ? amber : cyan, [1.02 + led * 0.12, 0.07, 1.77], [0.035, 0.045, 0.012], 0.003)
+    }
+  }
+
+  const engineeringLid = new THREE.Group()
+  engineeringLid.position.y = 1.23
+  engineering.add(engineeringLid)
+  precisionBox(engineeringLid, graphite, [0, 0, 0], [3.45, 0.18, 3.9], 0.065)
+  precisionBox(engineeringLid, alloy, [0, 0.11, 0], [3.17, 0.04, 3.61])
+  precisionBox(engineeringLid, dark, [0, 0.145, 0], [2.9, 0.035, 3.3])
+  for (let vent = 0; vent < 13; vent++) {
+    precisionBox(engineeringLid, graphite, [-1.15 + vent * 0.19, 0.17, -0.4], [0.065, 0.03, 1.8], 0.008)
+  }
+  const lidMark = label(
+    engineeringLid,
+    'SYSTEMS ARCHITECTURE',
+    '01 / 7 PRODUCTION ENGAGEMENTS',
+    [0, 0.17, 1.05],
+    2.55,
+    0.45,
+  )
+  lidMark.rotation.x = -Math.PI / 2
+
+  // Network endpoint rack with 7 active indicator ports (one per engineering engagement).
+  const endpoint = new THREE.Group()
+  endpoint.position.set(3.2, -0.35, -17.5)
+  group.add(endpoint)
+  precisionBox(endpoint, graphite, [0, 0, 0], [1.55, 2.2, 2.2], 0.09)
+  precisionBox(endpoint, alloy, [0, 0, 1.12], [1.34, 1.96, 0.06])
+  for (let port = 0; port < 7; port++) {
+    const py = 0.72 - port * 0.24
+    precisionBox(endpoint, dark, [0, py, 1.17], [0.92, 0.15, 0.07])
+    const led = precisionBox(endpoint, port === 0 ? amber : cyan, [0.52, py, 1.215], [0.055, 0.055, 0.025])
+    systemPorts.push(led)
+  }
+  label(endpoint, 'SYSTEM BUS', '7 ACTIVE DEPLOYMENTS', [0, 1.35, 0], 1.75, 0.42)
+  for (const z of [-15, -17]) {
+    line([-1, -1.5, z], [0, -1.5, z], [3.2, -1.5, z], [3.2, -1.5, -17.5])
+  }
+
+  // 02. INTELLIGENCE: Dual X-ray inputs feeding 5 DenseNet-LSTM feature layers.
+  const inputLabels = ['FRONTAL VIEW', 'LATERAL VIEW']
+  for (const [idx, side] of [-1, 1].entries()) {
+    const input = new THREE.Group()
+    input.position.set(side * 3.1, 0.2, -31)
+    movingBox(input, metal, [0, 0, 0], [2, 2.9, 0.22], true)
+    movingBox(input, dark, [0, 0, 0.13], [1.82, 2.68, 0.03])
+    for (let i = 0; i < 9; i++) {
+      movingBox(
+        input,
+        i % 3 === 0 ? cyan : ceramic,
+        [0, -1 + i * 0.235, 0.16],
+        [1.45 - Math.sin(i * 0.8) * 0.35, 0.04, 0.025],
+      )
+    }
+    label(input, `INPUT 0${idx + 1}`, inputLabels[idx], [0, 1.78, 0], 2.1, 0.52)
+    group.add(input)
+    inputFrames.push(input)
+    line([side * 3.1, -1.5, -31], [side * 1.8, -1.5, -33], [side * 1.8, -1.5, -41])
+  }
+
+  for (let layer = 0; layer < 5; layer++) {
+    const plane = new THREE.Group()
+    plane.position.z = -34 - layer * 1.65
+    movingBox(plane, metal, [-1.8, 0.45, 0], [0.06, 3.8, 0.12])
+    movingBox(plane, metal, [1.8, 0.45, 0], [0.06, 3.8, 0.12])
+    movingBox(plane, cyan, [0, 2.35, 0], [3.65, 0.018, 0.12])
+    for (const side of [-1, 1]) {
+      for (let n = 0; n < 5; n++) {
+        movingBox(plane, n % 2 ? ceramic : cyan, [side * 1.4, -0.8 + n * 0.57, 0], [0.13, 0.13, 0.13])
+        if (layer < 4) {
+          line(
+            [side * 1.4, -0.8 + n * 0.57, plane.position.z],
+            [side * 1.4, -0.8 + ((n + 2) % 5) * 0.57, plane.position.z - 1.65],
+          )
+        }
+      }
+    }
+    group.add(plane)
+    neuralLayers.push(plane)
+  }
+
+  label(group, 'DENSENET → LSTM', 'FEATURES BECOME LANGUAGE', [0, 3, -38], 3.8, 0.95)
+  for (let i = 0; i < 32; i++) {
+    const packet = new THREE.Mesh(new THREE.IcosahedronGeometry(0.075, 0), i % 4 === 0 ? amber : cyan)
+    group.add(packet)
+    dataPackets.push(packet)
+  }
+
+  // 03. DOMAINS: Four interconnected domain hubs (Enterprise & Gov, Academia & AI, Cybersecurity, Internal Ops).
+  const hubs = [
+    { x: -3.2, z: -52.5, title: 'ENTERPRISE & GOV', sub: 'PARAGON · BONTANG · LAMPTIP' },
+    { x: 3.2, z: -52.5, title: 'ACADEMIA & AI', sub: 'UNS · UPT TIK · BANGKIT ML' },
+    { x: -3.2, z: -57.5, title: 'CYBERSECURITY', sub: 'RAPIXUS VANS · ISHC-RG' },
+    { x: 3.2, z: -57.5, title: 'INTERNAL OPS', sub: 'MEIWA · SPMB · ADMISSIONS' },
+  ]
+  for (const hub of hubs) {
+    const node = new THREE.Group()
+    node.position.set(hub.x, -0.9, hub.z)
+    movingBox(node, metal, [0, 0, 0], [1.75, 0.6, 1.75], true)
+    movingBox(node, cyan, [0, 0.33, 0], [1.55, 0.035, 1.55])
+    movingBox(node, dark, [0, 0.4, 0], [1.35, 0.1, 1.35])
+    movingBox(node, ceramic, [0, 1, 0], [0.06, 1.1, 0.06])
+    label(node, hub.title, hub.sub, [0, 1.7, 0], 2.35, 0.58)
+    group.add(node)
+    mapNodes.push(node)
+    line([hub.x, -1.5, hub.z], [0, -1.5, -55])
+  }
+  line([-3.2, -1.51, -52.5], [3.2, -1.51, -52.5], [3.2, -1.51, -57.5], [-3.2, -1.51, -57.5], [-3.2, -1.51, -52.5])
+
+  // 04. EXPERIENCE: Eleven cartridges corresponding 1-to-1 to all 11 career roles.
+  experiences.forEach((role, i) => {
+    const side = i % 2 ? 1 : -1
+    const cartridge = new THREE.Group()
+    cartridge.position.set(side * 3.35, 0.25, -69 - Math.floor(i / 2) * 2.25)
+    cartridge.userData.restX = cartridge.position.x
+    movingBox(cartridge, metal, [0, 0, 0], [1.75, 2.9, 1.7], true)
+    movingBox(cartridge, dark, [0, 0, 0.88], [1.6, 2.7, 0.045])
+    movingBox(cartridge, cyan, [-0.67, 0, 0.92], [0.025, 2.42, 0.02])
+    label(
+      cartridge,
+      `${String(i + 1).padStart(2, '0')} / ${role.company}`,
+      role.period,
+      [0, 0.75, 0.925],
+      1.46,
+      0.42,
+    )
+    for (let k = 0; k < 6; k++) {
+      movingBox(cartridge, ceramic, [0.1, 0.15 - k * 0.18, 0.93], [1.03, 0.055, 0.02])
+    }
+    group.add(cartridge)
+    archiveCards.push(cartridge)
   })
-  const signalPath = new THREE.CatmullRomCurve3(pathPoints)
 
-  const mainConduitMesh = new THREE.Mesh(
-    trackGeo(new THREE.TubeGeometry(signalPath, 160, 0.045, 8, false)),
-    cyanEmissive,
-  )
-  group.add(mainConduitMesh)
+  // 05. TOOLKIT: Six skill cassettes attached to the central bus.
+  skills.forEach((skill, i) => {
+    const x = i % 2 ? 3.1 : -3.1
+    const z = -91 - Math.floor(i / 2) * 3.1
+    const cassette = new THREE.Group()
+    cassette.position.set(x, 0.1, z)
+    cassette.userData.restX = x
+    cassette.userData.restZ = z
+    movingBox(cassette, metal, [0, 0, 0], [2.15, 2.45, 0.65], true)
+    movingBox(cassette, glass, [0, 0, 0.38], [1.95, 2.2, 0.035])
+    for (let n = 0; n < 9; n++) {
+      movingBox(
+        cassette,
+        n === i ? amber : ceramic,
+        [((n % 3) - 1) * 0.5, (Math.floor(n / 3) - 1) * 0.45, 0.39],
+        [0.27, 0.2, 0.1],
+      )
+    }
+    label(cassette, skill.name, skill.items.slice(0, 2).join(' / '), [0, 1.7, 0], 2.4, 0.6)
+    group.add(cassette)
+    skillRings.push(cassette)
+    line([x, -1.5, z], [0, -1.5, z])
+  })
 
-  // Secondary braided amber trace along the conduit
-  const secondaryPoints = pathPoints.map(
-    (pt, i) =>
-      new THREE.Vector3(
-        pt.x + Math.cos(i * 0.45) * 0.14,
-        pt.y + Math.sin(i * 0.45) * 0.14,
-        pt.z,
-      ),
-  )
-  const secondaryCurve = new THREE.CatmullRomCurve3(secondaryPoints)
-  const secondaryConduitMesh = new THREE.Mesh(
-    trackGeo(new THREE.TubeGeometry(secondaryCurve, 160, 0.02, 6, false)),
-    amberEmissive,
-  )
-  group.add(secondaryConduitMesh)
+  // 06. CHANNEL: Communications terminal where the signal docks.
+  const terminal = new THREE.Group()
+  terminal.position.set(0, 0, -112)
+  movingBox(terminal, metal, [0, -0.9, 0], [3.6, 1.2, 2.3], true)
+  movingBox(terminal, ceramic, [0, -0.27, 0.1], [3.8, 0.13, 2.5], true)
+  movingBox(terminal, metal, [0, 0.9, -0.55], [3.9, 2.3, 0.28], true)
+  movingBox(terminal, cyan, [0, 0.9, -0.39], [3.64, 2.07, 0.025])
+  movingBox(terminal, dark, [0, 0.9, -0.36], [3.5, 1.94, 0.025])
+  label(terminal, 'CHANNEL OPEN', 'READY FOR NEW SYSTEMS & RESEARCH', [0, 1.05, -0.33], 3.3, 0.95)
+  movingBox(terminal, amber, [1.5, -0.17, 0.9], [0.18, 0.035, 0.18])
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 10; col++) {
+      box(ceramic, [-1.1 + col * 0.23, -0.16, -111.9 + row * 0.23], [0.18, 0.075, 0.17])
+    }
+  }
+  group.add(terminal)
 
-  // Periodic waveguide rings along the entire Z spine
-  const conduitRings: THREE.Mesh[] = []
-  const waveRingGeo = trackGeo(new THREE.TorusGeometry(0.42, 0.014, 8, 32))
-  for (let i = 0; i <= 36; i++) {
-    const t = i / 36
-    const ring = new THREE.Mesh(waveRingGeo, i % 3 === 0 ? amberEmissive : cyanEmissive)
-    signalPath.getPointAt(t, ring.position)
-    group.add(ring)
-    conduitRings.push(ring)
+  class SignalRoute extends THREE.Curve<THREE.Vector3> {
+    constructor() {
+      super()
+    }
+    getPoint(t: number, target = new THREE.Vector3()) {
+      return target.fromArray(signalPointAt(t))
+    }
   }
 
-  // Travelling Signal Core (faceted crystal + dual gimbal rings + point light)
+  const signalPath = new SignalRoute()
+  const route = new THREE.Mesh(new THREE.TubeGeometry(signalPath, 280, 0.028, 6, false), cyan)
+  group.add(route)
+
   const signal = new THREE.Group()
-  const signalCrystal = new THREE.Mesh(
-    trackGeo(new THREE.OctahedronGeometry(0.32, 1)),
-    crystalShellMat,
+  movingBox(
+    signal,
+    new THREE.MeshBasicMaterial({ color: 0xecfbff, toneMapped: false }),
+    [0, 0.15, 0],
+    [0.28, 0.28, 0.68],
+    true,
   )
-  const signalWire = new THREE.Mesh(
-    trackGeo(new THREE.OctahedronGeometry(0.36, 1)),
-    crystalWireMat,
-  )
-  const signalRingOuter = new THREE.Mesh(
-    trackGeo(new THREE.TorusGeometry(0.54, 0.022, 10, 36)),
-    cyanEmissive,
-  )
-  const signalRingInner = new THREE.Mesh(
-    trackGeo(new THREE.TorusGeometry(0.44, 0.018, 10, 36)),
-    amberEmissive,
-  )
-  signalRingInner.rotation.x = Math.PI / 2
-  const signalLight = new THREE.PointLight(0x45d7ff, 3.2, 11, 1.6)
-  signal.add(signalCrystal, signalWire, signalRingOuter, signalRingInner, signalLight)
-  signal.position.set(0, 1.15, 0)
+  const signalLight = new THREE.PointLight(0x36dfff, 4.5, 6, 2)
+  signal.add(signalLight)
   group.add(signal)
 
-  // ============================================================================
-  // STATION 00 (Z = 0) — ORIGIN · THE CRYSTALLINE SIGNAL MONOLITH
-  // ============================================================================
-  const originStation = new THREE.Group()
-  originStation.position.set(2.3, 1.35, 0)
-  group.add(originStation)
-
-  // Pedestal floor ring
-  const floorRingGeo = trackGeo(new THREE.RingGeometry(2.2, 2.32, 48))
-  const originFloorRing = new THREE.Mesh(floorRingGeo, cyanEmissive)
-  originFloorRing.rotation.x = -Math.PI / 2
-  originFloorRing.position.y = -2.85
-  originStation.add(originFloorRing)
-
-  // Inner crystalline core
-  const originCore = new THREE.Mesh(
-    trackGeo(new THREE.IcosahedronGeometry(1.18, 1)),
-    crystalShellMat,
-  )
-  const originCoreWire = new THREE.Mesh(
-    trackGeo(new THREE.IcosahedronGeometry(1.22, 1)),
-    crystalWireMat,
-  )
-  originStation.add(originCore, originCoreWire)
-
-  // 3 Gyroscopic containment rings
-  const originRings: THREE.Mesh[] = []
-  for (let i = 0; i < 3; i++) {
-    const r = new THREE.Mesh(
-      trackGeo(new THREE.TorusGeometry(1.65 + i * 0.34, 0.028, 10, 48)),
-      i === 1 ? amberEmissive : cyanEmissive,
-    )
-    r.rotation.set(i * 0.6, i * 0.8, 0)
-    originStation.add(r)
-    originRings.push(r)
-  }
-
-  // 8 Crystalline containment shards that radially unfold on scroll
-  const shellPanels: THREE.Mesh[] = []
-  const shardGeo = trackGeo(new THREE.OctahedronGeometry(0.52, 0))
-  shardGeo.scale(0.85, 1.65, 0.38)
-  for (let i = 0; i < 8; i++) {
-    const angle = (i / 8) * Math.PI * 2
-    const dx = Math.cos(angle)
-    const dz = Math.sin(angle)
-    const shard = new THREE.Mesh(shardGeo, i % 2 === 0 ? darkTitanium : crystalShellMat)
-    const edgeWire = new THREE.Mesh(shardGeo, crystalWireMat)
-    shard.add(edgeWire)
-    shard.userData = { direction: [dx, dz], angle }
-    shard.position.set(dx * 1.55, 0, dz * 1.55)
-    shard.rotation.y = -angle
-    originStation.add(shard)
-    shellPanels.push(shard)
-  }
-
-  addBadge(
-    originStation,
-    '00 // SIGNAL CORE',
-    'FULL-STACK · AI · CYBERSECURITY',
-    [0, 2.75, 0],
-    [2.65, 0.78],
-    '#45d7ff',
-    -0.25,
-  )
-
-  // ============================================================================
-  // STATION 01 (Z = -18) — SYSTEMS · 7-BLADE PRODUCTION RACK
-  // ============================================================================
-  const systemsStation = new THREE.Group()
-  systemsStation.position.set(-2.5, 0.85, -18)
-  group.add(systemsStation)
-
-  // Base chassis pedestal
-  const rackBase = new THREE.Mesh(
-    trackGeo(new THREE.CylinderGeometry(2.1, 2.35, 0.36, 8)),
-    darkTitanium,
-  )
-  rackBase.position.y = -2.1
-  systemsStation.add(rackBase)
-
-  // Top containment crown (engineeringLid)
-  const engineeringLid = new THREE.Mesh(
-    trackGeo(new THREE.CylinderGeometry(1.85, 2.05, 0.28, 8)),
-    brushedAlloy,
-  )
-  const lidRim = new THREE.Mesh(
-    trackGeo(new THREE.TorusGeometry(1.98, 0.03, 8, 32)),
-    cyanEmissive,
-  )
-  lidRim.rotation.x = Math.PI / 2
-  engineeringLid.add(lidRim)
-  engineeringLid.position.y = 1.65
-  systemsStation.add(engineeringLid)
-
-  addBadge(
-    systemsStation,
-    '01 // PRODUCTION SYSTEMS',
-    '7 DEPLOYMENTS · ENTERPRISE · GOV · SEC',
-    [0, 2.85, 0.4],
-    [2.9, 0.82],
-    '#45d7ff',
-    0.28,
-  )
-
-  // 7 Modular Server Blades representing all 7 Engineering Systems
-  const computeBlades: THREE.Group[] = []
-  const systemPorts: THREE.Mesh[] = []
-  const bladeGeo = trackGeo(new THREE.BoxGeometry(2.65, 0.22, 1.55))
-  const portGeo = trackGeo(new THREE.BoxGeometry(0.18, 0.14, 1.58))
-
-  engineeringSystems.forEach((sys, i) => {
-    const bladeGroup = new THREE.Group()
-    const restY = -1.45 + i * 0.44
-    const restZ = (i - 3) * 0.08
-    bladeGroup.position.set(0, restY, restZ)
-    bladeGroup.userData = { restY, restZ, index: i }
-
-    const chassis = new THREE.Mesh(bladeGeo, i % 2 === 0 ? darkTitanium : brushedAlloy)
-    const wire = new THREE.Mesh(bladeGeo, crystalWireMat)
-    bladeGroup.add(chassis, wire)
-
-    // Illuminated LED status bar on the right edge facing the conduit/camera
-    const portLed = new THREE.Mesh(
-      portGeo,
-      i === 0 ? cyanEmissive : dimPortMat,
-    )
-    portLed.position.set(1.34, 0, 0)
-    bladeGroup.add(portLed)
-    systemPorts.push(portLed)
-
-    // Compact blade label
-    addBadge(
-      bladeGroup,
-      `${sys.code} · ${sys.experience.company.slice(0, 14).toUpperCase()}`,
-      `${sys.domain} · ${sys.experience.period}`,
-      [0, 0.02, 0.79],
-      [2.3, 0.34],
-      i % 2 === 0 ? '#45d7ff' : '#ffa65c',
-      0,
-    )
-
-    systemsStation.add(bladeGroup)
-    computeBlades.push(bladeGroup)
+  const dummy = new THREE.Object3D()
+  batches.forEach((items, mat) => {
+    const instanced = new THREE.InstancedMesh(mat === metal || mat === ceramic ? rounded : unitBox, mat, items.length)
+    items.forEach((item, i) => {
+      dummy.position.set(item.p[0], item.p[1], item.p[2])
+      dummy.scale.set(item.s[0], item.s[1], item.s[2])
+      dummy.updateMatrix()
+      instanced.setMatrixAt(i, dummy.matrix)
+    })
+    group.add(instanced)
   })
 
-  // ============================================================================
-  // STATION 02 (Z = -36) — INTELLIGENCE · DENSENET-LSTM OPTICAL PRISM
-  // ============================================================================
-  const researchStation = new THREE.Group()
-  researchStation.position.set(2.4, 1.1, -36)
-  group.add(researchStation)
-
-  addBadge(
-    researchStation,
-    '02 // DENSENET121 + LSTM',
-    'IEEE PUBLISHED · BLEU-1 0.5625',
-    [0, 2.95, 0],
-    [2.85, 0.82],
-    '#ffa65c',
-    -0.25,
+  group.add(
+    new THREE.LineSegments(
+      new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(lines, 3)),
+      new THREE.LineBasicMaterial({ color: 0x2c829e, transparent: true, opacity: 0.52 }),
+    ),
   )
 
-  // Dual X-Ray input glass frames (Frontal & Lateral)
-  const inputFrames: THREE.Group[] = []
-  const xrayFrameGeo = trackGeo(new THREE.BoxGeometry(1.35, 1.75, 0.08))
-  for (let i = 0; i < 2; i++) {
-    const frameGroup = new THREE.Group()
-    frameGroup.position.set(i === 0 ? -1.05 : 1.05, 0.2, 2.3)
-    const glass = new THREE.Mesh(xrayFrameGeo, crystalShellMat)
-    const border = new THREE.Mesh(xrayFrameGeo, crystalWireMat)
-    const scanBar = new THREE.Mesh(
-      trackGeo(new THREE.BoxGeometry(1.25, 0.04, 0.12)),
-      i === 0 ? cyanEmissive : amberEmissive,
-    )
-    scanBar.name = 'scanBar'
-    frameGroup.add(glass, border, scanBar)
-    researchStation.add(frameGroup)
-    inputFrames.push(frameGroup)
-  }
-
-  // 5 Cascading Neural Feature Prisms (DenseNet-121 blocks -> Attention -> LSTM)
-  const neuralLayers: THREE.Group[] = []
-  for (let i = 0; i < 5; i++) {
-    const layerGroup = new THREE.Group()
-    layerGroup.position.set(0, 0.15, 1.1 - i * 0.85)
-    const radius = 1.55 - i * 0.16
-    const ring = new THREE.Mesh(
-      trackGeo(new THREE.TorusGeometry(radius, 0.032, 8, 6)),
-      i % 2 === 0 ? cyanEmissive : amberEmissive,
-    )
-    const plate = new THREE.Mesh(
-      trackGeo(new THREE.CylinderGeometry(radius * 0.82, radius * 0.82, 0.06, 6)),
-      crystalShellMat,
-    )
-    plate.rotation.x = Math.PI / 2
-    layerGroup.add(ring, plate)
-    researchStation.add(layerGroup)
-    neuralLayers.push(layerGroup)
-  }
-
-  // Streaming Synaptic Data Packets
-  const dataPackets: THREE.Mesh[] = []
-  const packetGeo = trackGeo(new THREE.OctahedronGeometry(0.09, 0))
-  for (let i = 0; i < 20; i++) {
-    const pkt = new THREE.Mesh(packetGeo, i % 2 === 0 ? cyanEmissive : amberEmissive)
-    group.add(pkt)
-    dataPackets.push(pkt)
-  }
-
-  // ============================================================================
-  // STATION 03 (Z = -54) — DOMAINS · 4-ARENA ORBITAL NEXUS
-  // ============================================================================
-  const domainsStation = new THREE.Group()
-  domainsStation.position.set(-2.3, 0.8, -54)
-  group.add(domainsStation)
-
-  // Central Nexus Spire
-  const nexusCore = new THREE.Mesh(
-    trackGeo(new THREE.OctahedronGeometry(0.85, 1)),
-    crystalShellMat,
-  )
-  const nexusWire = new THREE.Mesh(
-    trackGeo(new THREE.OctahedronGeometry(0.9, 1)),
-    crystalWireMat,
-  )
-  const nexusRing = new THREE.Mesh(
-    trackGeo(new THREE.TorusGeometry(2.45, 0.025, 10, 48)),
-    cyanEmissive,
-  )
-  nexusRing.rotation.x = Math.PI / 2
-  domainsStation.add(nexusCore, nexusWire, nexusRing)
-
-  addBadge(
-    domainsStation,
-    '03 // FOUR ARENAS',
-    'ENT · UNI · SEC · OPS',
-    [0, 3.05, 0],
-    [2.7, 0.78],
-    '#45d7ff',
-    0.26,
-  )
-
-  const mapNodes: THREE.Group[] = []
-  const domainOffsets: [number, number][] = [
-    [-1.85, 1.35],
-    [1.85, 1.35],
-    [-1.85, -1.35],
-    [1.85, -1.35],
-  ]
-  perspectiveDomains.forEach((dom, i) => {
-    const node = new THREE.Group()
-    const [ox, oz] = domainOffsets[i] ?? [0, 0]
-    node.position.set(ox, 0, oz)
-    node.userData = { baseX: ox, baseZ: oz, index: i }
-
-    const pillar = new THREE.Mesh(
-      trackGeo(new THREE.CylinderGeometry(0.62, 0.74, 0.9, 6)),
-      darkTitanium,
-    )
-    const crystalCap = new THREE.Mesh(
-      trackGeo(new THREE.OctahedronGeometry(0.46, 0)),
-      crystalShellMat,
-    )
-    crystalCap.position.y = 0.72
-    const halo = new THREE.Mesh(
-      trackGeo(new THREE.TorusGeometry(0.76, 0.024, 8, 24)),
-      i % 2 === 0 ? cyanEmissive : amberEmissive,
-    )
-    halo.rotation.x = Math.PI / 2
-    halo.position.y = 0.46
-    node.add(pillar, crystalCap, halo)
-
-    addBadge(
-      node,
-      `${dom.code} · ${dom.name.slice(0, 14).toUpperCase()}`,
-      dom.meta,
-      [0, 1.45, 0],
-      [2.05, 0.56],
-      i % 2 === 0 ? '#45d7ff' : '#ffa65c',
-      0.2,
-    )
-
-    domainsStation.add(node)
-    mapNodes.push(node)
-  })
-
-  // ============================================================================
-  // STATION 04 (Z = -72) — EXPERIENCE · 11-NODE HELICAL ARCHIVE VAULT
-  // ============================================================================
-  const archiveStation = new THREE.Group()
-  archiveStation.position.set(2.1, 1.15, -72)
-  group.add(archiveStation)
-
-  addBadge(
-    archiveStation,
-    '04 // CAREER ARCHIVE',
-    '11 ROLES · HELICAL DATA VAULT',
-    [0, 3.1, 2.5],
-    [2.75, 0.8],
-    '#45d7ff',
-    -0.24,
-  )
-
-  const archiveCards: THREE.Group[] = []
-  const cardGeo = trackGeo(new THREE.BoxGeometry(2.15, 0.36, 0.82))
-  experiences.forEach((exp, i) => {
-    const card = new THREE.Group()
-    const t = i / (experiences.length - 1) - 0.5 // -0.5 .. +0.5
-    const angle = t * Math.PI * 1.35
-    const restX = Math.cos(angle) * 1.45
-    const restY = t * -3.2
-    const restZ = t * -7.2
-    card.position.set(restX, restY, restZ)
-    card.userData = { restX, restY, restZ, index: i }
-
-    const body = new THREE.Mesh(cardGeo, i % 2 === 0 ? darkTitanium : brushedAlloy)
-    const wire = new THREE.Mesh(cardGeo, crystalWireMat)
-    const indicator = new THREE.Mesh(
-      trackGeo(new THREE.BoxGeometry(0.12, 0.3, 0.86)),
-      i === 0 ? cyanEmissive : amberEmissive,
-    )
-    indicator.position.x = -1.04
-    card.add(body, wire, indicator)
-
-    addBadge(
-      card,
-      `${String(i + 1).padStart(2, '0')} · ${exp.company.slice(0, 15).toUpperCase()}`,
-      `${exp.role.slice(0, 20)} · ${exp.period}`,
-      [0.05, 0, 0.43],
-      [1.95, 0.32],
-      i % 2 === 0 ? '#45d7ff' : '#ffa65c',
-      -0.18,
-    )
-
-    archiveStation.add(card)
-    archiveCards.push(card)
-  })
-
-  // ============================================================================
-  // STATION 05 (Z = -90) — TOOLKIT · 6-CLUSTER GYROSCOPIC MATRIX
-  // ============================================================================
-  const skillsStation = new THREE.Group()
-  skillsStation.position.set(-2.3, 1.25, -90)
-  group.add(skillsStation)
-
-  const matrixCore = new THREE.Mesh(
-    trackGeo(new THREE.DodecahedronGeometry(0.95, 0)),
-    crystalShellMat,
-  )
-  const matrixWire = new THREE.Mesh(
-    trackGeo(new THREE.DodecahedronGeometry(1.0, 0)),
-    crystalWireMat,
-  )
-  skillsStation.add(matrixCore, matrixWire)
-
-  addBadge(
-    skillsStation,
-    '05 // TECHNICAL MATRIX',
-    '6 CLUSTERS · 32 TECHNOLOGIES',
-    [0, 3.05, 0],
-    [2.75, 0.8],
-    '#ffa65c',
-    0.25,
-  )
-
-  const skillRings: THREE.Group[] = []
-  const cassetteGeo = trackGeo(new THREE.BoxGeometry(1.85, 0.42, 0.65))
-  skills.forEach((cat, i) => {
-    const cassette = new THREE.Group()
-    const angle = (i / skills.length) * Math.PI * 2
-    const restX = Math.cos(angle) * 2.35
-    const restY = Math.sin(angle) * 1.45
-    const restZ = Math.sin(angle * 2) * 0.65
-    cassette.position.set(restX, restY, restZ)
-    cassette.userData = { restX, restY, restZ, angle, index: i }
-
-    const hull = new THREE.Mesh(cassetteGeo, darkTitanium)
-    const wire = new THREE.Mesh(cassetteGeo, crystalWireMat)
-    const rim = new THREE.Mesh(
-      trackGeo(new THREE.BoxGeometry(1.88, 0.06, 0.68)),
-      i % 2 === 0 ? cyanEmissive : amberEmissive,
-    )
-    rim.position.y = 0.2
-    cassette.add(hull, wire, rim)
-
-    addBadge(
-      cassette,
-      `0${i + 1} · ${cat.name.slice(0, 16).toUpperCase()}`,
-      cat.items.slice(0, 3).join(' · '),
-      [0, 0, 0.34],
-      [1.75, 0.36],
-      i % 2 === 0 ? '#45d7ff' : '#ffa65c',
-      0.18,
-    )
-
-    skillsStation.add(cassette)
-    skillRings.push(cassette)
-  })
-
-  // ============================================================================
-  // STATION 06 (Z = -108) — CHANNEL · DIRECT UPLINK BEACON
-  // ============================================================================
-  const contactStation = new THREE.Group()
-  contactStation.position.set(0, 1.5, -108)
-  group.add(contactStation)
-
-  const beaconCrystal = new THREE.Mesh(
-    trackGeo(new THREE.OctahedronGeometry(1.15, 1)),
-    crystalShellMat,
-  )
-  const beaconWire = new THREE.Mesh(
-    trackGeo(new THREE.OctahedronGeometry(1.2, 1)),
-    crystalWireMat,
-  )
-  contactStation.add(beaconCrystal, beaconWire)
-
-  const beaconRings: THREE.Mesh[] = []
-  for (let i = 0; i < 3; i++) {
-    const ring = new THREE.Mesh(
-      trackGeo(new THREE.TorusGeometry(1.7 + i * 0.48, 0.028, 10, 48)),
-      i === 1 ? amberEmissive : cyanEmissive,
-    )
-    contactStation.add(ring)
-    beaconRings.push(ring)
-  }
-
-  addBadge(
-    contactStation,
-    '06 // SIGNAL LOCKED',
-    'DIRECT UPLINK · READY TO BUILD',
-    [0, 2.95, 0],
-    [2.85, 0.8],
-    '#45d7ff',
-    0,
-  )
-
-  const dispose = () => {
+  function dispose() {
+    const geometries = new Set<THREE.BufferGeometry>()
+    const materials = new Set<THREE.Material>()
+    group.traverse((object) => {
+      const objectMesh = object as THREE.Mesh
+      if (objectMesh.geometry) geometries.add(objectMesh.geometry)
+      if (objectMesh.material) {
+        ;(Array.isArray(objectMesh.material) ? objectMesh.material : [objectMesh.material]).forEach((m) =>
+          materials.add(m),
+        )
+      }
+    })
     geometries.forEach((g) => g.dispose())
     materials.forEach((m) => m.dispose())
     textures.forEach((t) => t.dispose())
@@ -712,29 +436,19 @@ export function buildCyberWorld() {
 
   return {
     group,
-    signal,
-    signalPath,
-    conduitRings,
-    particleField,
-    originCore,
-    originRings,
     shellPanels,
-    engineeringLid,
-    computeBlades,
-    systemPorts,
-    cyanEmissive,
-    amberEmissive,
-    dimPortMat,
+    signalPath,
+    signal,
     inputFrames,
     neuralLayers,
-    dataPackets,
-    nexusCore,
     mapNodes,
     archiveCards,
-    matrixCore,
     skillRings,
-    beaconCrystal,
-    beaconRings,
+    computeBlades,
+    systemPorts,
+    engineeringLid,
+    dataPackets,
+    terminal,
     dispose,
   }
 }
