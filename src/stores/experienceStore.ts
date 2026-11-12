@@ -25,7 +25,7 @@ export const useExperienceStore = defineStore('experience', () => {
       document.documentElement.classList.toggle('dark', theme.value === 'dark')
       const meta = document.querySelector('meta[name="theme-color"]')
       if (meta) {
-        meta.setAttribute('content', theme.value === 'dark' ? '#0c0f0d' : '#f2efe9')
+        meta.setAttribute('content', theme.value === 'dark' ? '#050a11' : '#e8eff2')
       }
     }
   })
@@ -33,13 +33,13 @@ export const useExperienceStore = defineStore('experience', () => {
   function getModeFromHash(): ExperienceMode | null {
     if (typeof window === 'undefined') return null
     const hash = window.location.hash.toLowerCase()
-    if (hash === '#clean' || hash === '#terminal' || hash === '#home') return 'clean'
+    if (hash === '#clean' || hash === '#index' || hash === '#reading') return 'clean'
     if (hash === '#3d' || hash === '#immersive') return 'immersive'
     return null
   }
 
   const initialHashMode = getModeFromHash()
-  const storedMode = useStorage<ExperienceMode>('portfolio-view', 'clean')
+  const storedMode = useStorage<ExperienceMode>('portfolio-chained-mode', 'immersive')
   const mode = ref<ExperienceMode>(initialHashMode ?? storedMode.value)
 
   if (typeof window !== 'undefined') {
@@ -56,12 +56,11 @@ export const useExperienceStore = defineStore('experience', () => {
   }
 
   const soundEnabled = useStorage<boolean>('portfolio-sound', false)
+  const activeSystemIndex = ref(0)
+  const activeDomainIndex = ref(0)
   const activeNodeIndex = ref(0)
-  const totalNodes = ref(11)
-  const carouselRotation = ref(0)
-  const journeyProgress = ref(0)
   const activeSkillIndex = ref(0)
-  const activeResearchIndex = ref(0)
+  const scrollProgress = ref(0)
 
   watch(mode, (newMode) => {
     storedMode.value = newMode
@@ -86,55 +85,6 @@ export const useExperienceStore = defineStore('experience', () => {
     animationsEnabled.value = !animationsEnabled.value
   }
 
-  const showFpsWarning = ref(false)
-  let fpsFrames = 0
-  let fpsLastTime = performance.now()
-  let lowFpsCount = 0
-  let fpsAnimId: number | null = null
-
-  function startFpsMonitor() {
-    if (mode.value !== 'immersive') return
-    fpsFrames = 0
-    fpsLastTime = performance.now()
-    lowFpsCount = 0
-
-    const checkFps = () => {
-      fpsFrames++
-      const now = performance.now()
-      if (now - fpsLastTime >= 1000) {
-        const fps = fpsFrames
-        fpsFrames = 0
-        fpsLastTime = now
-        if (fps < 28) {
-          lowFpsCount++
-          if (lowFpsCount >= 3) {
-            showFpsWarning.value = true
-          }
-        } else {
-          lowFpsCount = Math.max(0, lowFpsCount - 1)
-        }
-      }
-      if (mode.value === 'immersive') {
-        fpsAnimId = requestAnimationFrame(checkFps)
-      }
-    }
-    fpsAnimId = requestAnimationFrame(checkFps)
-  }
-
-  function stopFpsMonitor() {
-    if (fpsAnimId !== null) {
-      cancelAnimationFrame(fpsAnimId)
-      fpsAnimId = null
-    }
-    showFpsWarning.value = false
-  }
-
-  function dismissFpsWarning() {
-    showFpsWarning.value = false
-  }
-
-  const scrollProgress = ref(0)
-
   function updateScrollProgress() {
     if (typeof window === 'undefined') return
     const docHeight = document.documentElement.scrollHeight - window.innerHeight
@@ -152,17 +102,11 @@ export const useExperienceStore = defineStore('experience', () => {
     toggleAnimations,
     soundEnabled,
     toggleSound,
+    activeSystemIndex,
+    activeDomainIndex,
     activeNodeIndex,
-    totalNodes,
-    carouselRotation,
-    journeyProgress,
     activeSkillIndex,
-    activeResearchIndex,
     scrollProgress,
     updateScrollProgress,
-    showFpsWarning,
-    startFpsMonitor,
-    stopFpsMonitor,
-    dismissFpsWarning,
   }
 })

@@ -1,51 +1,86 @@
 import { onMounted, onBeforeUnmount, reactive, type Ref } from 'vue'
-import gsap from 'gsap'
-import { LAST_POSITION, MAX_JOURNEY_BOOST, MAX_JOURNEY_SPEED, advanceJourney } from '@/utils/cyberStory'
+import { LAST_POSITION } from '@/utils/cyberStory'
 import { getLenis } from '@/composables/useSmoothScroll'
 
-export const cyberJourney = reactive({ position: 0, scroll: 0, unit: 1400, start: 0 })
+export const cyberJourney = reactive({
+  position: 0,
+  scroll: 0,
+  unit: 1400,
+  start: 0,
+})
 
-// A navigation jump (menu, chapter track, keyboard) may fly faster than a
-// wheel gesture, scaled by how far it still has to go. Any manual input
-// returns control to the normal bounded follow.
+const frameListeners = new Set<(position: number) => void>()
+
+export function onCyberFrame(cb: (position: number) => void): () => void {
+  frameListeners.add(cb)
+  return () => {
+    frameListeners.delete(cb)
+  }
+}
+
 let boostTarget: number | null = null
-export function boostJourney(position: number) { boostTarget = position }
-function cancelBoost() { boostTarget = null }
+export function boostJourney(position: number) {
+  boostTarget = position
+}
+function cancelBoost() {
+  boostTarget = null
+}
 
 export function useCyberJourney(root: Ref<HTMLElement | null>) {
   let resizeObserver: ResizeObserver | null = null
+  let rafId = 0
   let lastTime = 0
-  let velocity = 0
   let initialized = false
+  let currentPos = 0
 
   const measure = () => {
     if (!root.value) return
     const currentY = window.scrollY
     cyberJourney.start = root.value.getBoundingClientRect().top + currentY
-    cyberJourney.unit = (root.value.offsetHeight - window.innerHeight) / LAST_POSITION
+    cyberJourney.unit = Math.max(1, (root.value.offsetHeight - window.innerHeight) / LAST_POSITION)
   }
 
-  const tick = () => {
-    const now = performance.now()
-    if (document.querySelector('dialog[open]')) { lastTime = now; return }
+  const tick = (now: number) => {
+    rafId = requestAnimationFrame(tick)
+    if (document.querySelector('dialog[open]')) {
+      lastTime = now
+      return
+    }
+    const dt = Math.min(0.05, Math.max(0.001, (now - (lastTime || now)) / 1000))
+    lastTime = now
+
     const scrollY = getLenis()?.animatedScroll ?? window.scrollY
-    const target = Math.max(0, Math.min(LAST_POSITION, (scrollY - cyberJourney.start) / Math.max(1, cyberJourney.unit)))
+    const target = Math.max(0, Math.min(LAST_POSITION, (scrollY - cyberJourney.start) / cyberJourney.unit))
     cyberJourney.scroll = scrollY
+
     if (!initialized) {
-      cyberJourney.position = target
+      currentPos = target
       initialized = true
     } else {
-      let maxSpeed = MAX_JOURNEY_SPEED
-      if (boostTarget !== null) {
-        const remaining = Math.abs(boostTarget - cyberJourney.position)
+      const error = target - currentPos
+      if (Math.abs(error) < 0.00015) {
+        currentPos = target
+        boostTarget = null
+      } else if (boostTarget !== null) {
+        const remaining = Math.abs(boostTarget - currentPos)
         if (remaining < 0.02) boostTarget = null
-        else maxSpeed = Math.min(MAX_JOURNEY_BOOST, MAX_JOURNEY_SPEED + remaining * 0.32)
+        const damp = 1 - Math.exp(-10 * dt)
+        const maxStep = Math.max(1.35, remaining * 0.85) * dt
+        const step = error * damp
+        currentPos += Math.sign(step) * Math.min(Math.abs(step), maxStep)
+      } else {
+        // Critically damped tracking synced with Lenis sub-pixel scroll:
+        // responsive to wheel/touch without double-lag, bounded against tab-restore spikes.
+        const damp = 1 - Math.exp(-15 * dt)
+        const maxStep = 1.8 * dt
+        const step = error * damp
+        currentPos += Math.sign(step) * Math.min(Math.abs(step), maxStep)
       }
-      const next = advanceJourney(cyberJourney.position, velocity, target, (now - lastTime) / 1000, maxSpeed)
-      cyberJourney.position = next.position
-      velocity = next.velocity
+      currentPos = Math.max(0, Math.min(LAST_POSITION, currentPos))
     }
-    lastTime = now
+
+    cyberJourney.position = currentPos
+    frameListeners.forEach((fn) => fn(currentPos))
   }
 
   onMounted(() => {
@@ -55,12 +90,12 @@ export function useCyberJourney(root: Ref<HTMLElement | null>) {
     window.addEventListener('resize', measure, { passive: true })
     window.addEventListener('wheel', cancelBoost, { passive: true })
     window.addEventListener('touchstart', cancelBoost, { passive: true })
-    gsap.ticker.add(tick)
-    tick()
+    lastTime = performance.now()
+    rafId = requestAnimationFrame(tick)
   })
 
   onBeforeUnmount(() => {
-    gsap.ticker.remove(tick)
+    cancelAnimationFrame(rafId)
     resizeObserver?.disconnect()
     window.removeEventListener('resize', measure)
     window.removeEventListener('wheel', cancelBoost)

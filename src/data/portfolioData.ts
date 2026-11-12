@@ -52,11 +52,11 @@ export interface Language {
 export const personalInfo: PersonalInfo = {
   name: 'Mohammad Al Furqon',
   title: 'Software Engineer & ML Researcher',
-  tagline: 'Web applications, internal tools, and machine learning research.',
+  tagline: 'Fullstack web architectures, enterprise systems, security operations, and medical AI research.',
   website: 'lucialf.my.id',
   linkedin: 'linkedin.com/in/lucialf',
   email: 'mohammadalfurqon62@gmail.com',
-  about: `Software engineer from Indonesia. I hold a bachelor's degree in Informatics from Universitas Sebelas Maret, and I have worked on internal systems at a manufacturer in Japan, vulnerability assessment in Taiwan, and web applications for local government, universities, and private clients. My research focuses on machine learning for medical images.`,
+  about: `Software engineer and machine learning researcher with a B.Sc. in Informatics from Universitas Sebelas Maret (GPA 3.77 / 4.00). Across 11 roles, I have engineered enterprise HR systems, government authentication APIs, higher-education accreditation platforms, university procurement tools, vulnerability assessment operations, and internal manufacturing software, alongside deep learning research in medical image captioning.`,
 }
 
 export const education: Education[] = [

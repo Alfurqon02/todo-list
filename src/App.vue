@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useExperienceStore } from '@/stores/experienceStore'
-import ParticleJourneyExperience from '@/components/ParticleJourneyExperience.vue'
-import FlagshipExperience from '@/components/FlagshipExperience.vue'
+import CyberJourneyExperience from '@/components/CyberJourneyExperience.vue'
+import PortfolioExperience from '@/components/PortfolioExperience.vue'
 
 const store = useExperienceStore()
 const curtain = ref<'to-3d' | 'to-reading' | null>(null)
@@ -18,17 +18,17 @@ watch(
     curtain.value = next === 'immersive' ? 'to-3d' : 'to-reading'
     timer = setTimeout(() => {
       curtain.value = null
-    }, 950)
+    }, 900)
   },
 )
 </script>
 
 <template>
-  <ParticleJourneyExperience v-if="store.mode === 'immersive'" />
-  <FlagshipExperience v-else />
+  <CyberJourneyExperience v-if="store.mode === 'immersive'" />
+  <PortfolioExperience v-else />
   <div v-if="curtain" class="mode-curtain" :class="curtain" aria-hidden="true">
-    <span class="mode-curtain-label">{{
-      curtain === 'to-3d' ? '00 / ENTERING 3D JOURNEY' : 'RETURNING TO PORTFOLIO'
-    }}</span>
+    <span class="mode-curtain-label">
+      {{ curtain === 'to-3d' ? '00 / ENTERING 3D CHAINED JOURNEY' : 'OPENING FULL PORTFOLIO INDEX' }}
+    </span>
   </div>
 </template>

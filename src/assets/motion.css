@@ -38,7 +38,7 @@
   pointer-events: all;
   display: grid;
   place-items: center;
-  background: var(--fs-bg, #0c0f0d);
+  background: var(--cy-bg, #050a11);
   animation: curtain-sweep 0.95s var(--ease-in-out-quint) both;
 }
 
@@ -49,17 +49,17 @@
   right: 0;
   top: 50%;
   height: 1px;
-  background: linear-gradient(90deg, transparent, var(--fs-accent, #b8e892), transparent);
+  background: linear-gradient(90deg, transparent, var(--cy-accent, #45d7ff), transparent);
   transform: scaleX(0);
   animation: curtain-line 0.95s var(--ease-out-expo) both;
 }
 
 .mode-curtain-label {
   position: relative;
-  font: 500 11px var(--fs-mono, 'JetBrains Mono', monospace);
+  font: 500 11px var(--cy-mono, 'JetBrains Mono', monospace);
   letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: var(--fs-accent, #b8e892);
+  color: var(--cy-accent, #45d7ff);
   padding-top: 32px;
   animation: curtain-label 0.95s ease both;
 }
