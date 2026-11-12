@@ -1,8 +1,4 @@
-// ============================================
-// CENTRALIZED CV & PORTFOLIO DATA
-// All content sourced from Mohammad_Al_Furqon_CV.md
-// Rule 4.1: No hardcoded data in Vue components
-// ============================================
+// Source of truth for CV and portfolio records from cv.md.
 
 export interface PersonalInfo {
   name: string
@@ -53,49 +49,36 @@ export interface Language {
   percentage: number
 }
 
-// ============================================
-// PERSONAL INFO
-// ============================================
 export const personalInfo: PersonalInfo = {
   name: 'Mohammad Al Furqon',
-  title: 'Fullstack Web Developer & Software Engineer',
-  tagline: 'Building robust digital experiences with precision and creativity.',
+  title: 'Software Engineer & ML Researcher',
+  tagline: 'Web applications, internal tools, and machine learning research.',
   website: 'lucialf.my.id',
   linkedin: 'linkedin.com/in/lucialf',
   email: 'mohammadalfurqon62@gmail.com',
-  about: `A passionate Fullstack Developer and Software Engineer with extensive experience spanning Japanese industry, 
-government agencies, academic institutions, and international cybersecurity operations. 
-Graduated from Universitas Sebelas Maret in Program Study of Informatics with strong fundamentals in Machine Learning and Software Engineering. 
-Skilled in building secure, scalable web applications and contributing to cutting-edge research 
-in Machine Learning and Humanized Computing.`,
+  about: `Software engineer from Indonesia. I hold a bachelor's degree in Informatics from Universitas Sebelas Maret, and I have worked on internal systems at a manufacturer in Japan, vulnerability assessment in Taiwan, and web applications for local government, universities, and private clients. My research focuses on machine learning for medical images.`,
 }
 
-// ============================================
-// EDUCATION
-// ============================================
 export const education: Education[] = [
   {
     institution: 'Universitas Sebelas Maret',
     degree: 'Bachelor of Informatics',
     gpa: '3.77 / 4.00',
-    period: 'Aug 2021 — Jan 2026',
+    period: 'Aug 2021 - Jan 2026',
   },
   {
     institution: 'SMA Negeri 7 Bengkulu',
     degree: 'Science and Mathematics',
     gpa: '93 / 100',
-    period: 'Sept 2018 — May 2021',
+    period: 'Sept 2018 - May 2021',
   },
 ]
 
-// ============================================
-// WORK EXPERIENCES
-// ============================================
 export const experiences: Experience[] = [
   {
     company: 'Paragon Technology and Innovation',
     role: 'Software Engineer (HR Technology) Intern',
-    period: 'Aug 2026 — Present',
+    period: 'Aug 2026 - Present',
     highlights: [
       'Refactor and fix bugs from legacy codebase in HR application systems',
     ],
@@ -104,7 +87,7 @@ export const experiences: Experience[] = [
   {
     company: 'Self Employed',
     role: 'Freelance Fullstack Web Developer',
-    period: 'Aug 2024 — Present',
+    period: 'Aug 2024 - Present',
     highlights: [
       'Handle various websites for diverse companies and individuals',
       'Manage all requested features from clients and implement into production',
@@ -115,8 +98,8 @@ export const experiences: Experience[] = [
   },
   {
     company: 'LAMPTIP',
-    role: 'Web Developer — Part Time',
-    period: 'Nov 2025 — Present',
+    role: 'Web Developer (Part Time)',
+    period: 'Nov 2025 - Present',
     highlights: [
       'Fullstack Developer at Lembaga Akreditasi Mandiri Pendidikan Tinggi Ilmu Pertanian',
       'Maintain and update the main website infrastructure',
@@ -127,8 +110,8 @@ export const experiences: Experience[] = [
   },
   {
     company: 'DISPERKIMTAN Bontang City',
-    role: 'Web Developer — Contract',
-    period: 'Sept 2025 — Feb 2026',
+    role: 'Web Developer (Contract)',
+    period: 'Sept 2025 - Feb 2026',
     highlights: [
       'Created user authentication and authorization system using JWT Token',
       'Built role management system for user access control',
@@ -140,8 +123,8 @@ export const experiences: Experience[] = [
   },
   {
     company: 'Meiwa Industry Japan (明和工業株式会社)',
-    role: 'Software Engineer — Internship',
-    period: 'June 2024 — June 2025',
+    role: 'Software Engineer (Internship)',
+    period: 'June 2024 - June 2025',
     highlights: [
       'Normalized database tables on "Meiwa Portal" web application',
       'Refactored code from bad practices to better practice standards',
@@ -155,7 +138,7 @@ export const experiences: Experience[] = [
   {
     company: 'Rapixus Taiwan',
     role: 'VANS Operator',
-    period: 'Jan 2024 — March 2024',
+    period: 'Jan 2024 - March 2024',
     highlights: [
       'Operated RAPIXUS RapixEngine VANS platform for vulnerability scans and risk assessments',
       'Managed IT asset inventories using standardized CPE formats',
@@ -167,7 +150,7 @@ export const experiences: Experience[] = [
   {
     company: 'SPMB Universitas Sebelas Maret',
     role: 'Helpdesk Seleksi Mandiri',
-    period: 'June 2023 — July 2024',
+    period: 'June 2023 - July 2024',
     highlights: [
       'Performed first-line troubleshooting for registration system glitches',
       'Coordinated with Central Admissions Committee and IT team for issue resolution',
@@ -185,26 +168,26 @@ export const experiences: Experience[] = [
   },
   {
     company: 'UPT TIK UNS',
-    role: 'Software Developer — Internship',
-    period: 'Jan 2023 — Mar 2024',
+    role: 'Software Developer (Internship)',
+    period: 'Jan 2023 - Mar 2024',
     highlights: [
-      'Co-developed "Report-PBJ" — web app for managing university procurement workflows',
-      'Updated "Domain-MS" — domain management system for Universitas Sebelas Maret',
+      'Co-developed "Report-PBJ", a web app for managing university procurement workflows',
+      'Updated "Domain-MS", the domain management system for Universitas Sebelas Maret',
       'Participated in "SEMANTIK" collaboration event with Indosat and Telkomsel',
       'Led cybersecurity awareness socialization with Karanganyar government',
     ],
     tags: ['Government', 'Web App', 'Procurement'],
   },
   {
-    company: 'Assistant Lecturer — S1 Informatika UNS',
+    company: 'Assistant Lecturer, S1 Informatika UNS',
     role: 'Teaching Assistant',
-    period: 'Aug 2022 — June 2024',
+    period: 'Aug 2022 - June 2024',
     highlights: [
-      'Programming Concepts Course (Aug 2022 — Dec 2023)',
-      'Data Structure and Algorithm Course (Feb 2022 — July 2023)',
-      'Object Oriented Programming Course (Aug 2023 — Dec 2023)',
-      'Database Course (Aug 2023 — Dec 2023)',
-      'Web Programming Course (Jan 2024 — June 2024)',
+      'Programming Concepts Course (Aug 2022 - Dec 2023)',
+      'Data Structure and Algorithm Course (Feb 2022 - July 2023)',
+      'Object Oriented Programming Course (Aug 2023 - Dec 2023)',
+      'Database Course (Aug 2023 - Dec 2023)',
+      'Web Programming Course (Jan 2024 - June 2024)',
       'Shared knowledge, created materials, and evaluated student assignments',
     ],
     tags: ['Teaching', 'DSA', 'OOP', 'Database', 'Web'],
@@ -212,7 +195,7 @@ export const experiences: Experience[] = [
   {
     company: 'FATISDA UNS',
     role: 'Accreditation Team & ISHC-RG Research Assistant',
-    period: 'Aug 2022 — Aug 2023',
+    period: 'Aug 2022 - Aug 2023',
     highlights: [
       'Conducted exploratory research in cybersecurity and Humanized Computing',
       'Collected, processed, and analyzed network security data for risk assessments',
@@ -223,9 +206,6 @@ export const experiences: Experience[] = [
   },
 ]
 
-// ============================================
-// ACHIEVEMENTS
-// ============================================
 export const achievements: Achievement[] = [
   {
     title: 'Book Author',
@@ -234,44 +214,38 @@ export const achievements: Achievement[] = [
   },
   {
     title: 'Undergraduate Thesis',
-    description: '"Dual-View Radiographic Captioning for Chest X-ray Frontal and Lateral using DenseNet-LSTM" — Undergraduate Publication.',
+    description: '"Dual-View Radiographic Captioning for Chest X-ray Frontal and Lateral using DenseNet-LSTM", Undergraduate Publication.',
     icon: 'graduation-cap',
   },
 ]
 
-// ============================================
-// ORGANIZATIONS & VOLUNTEER
-// ============================================
 export const organizations: Organization[] = [
   {
     name: 'Himpunan Mahasiswa Informatika UNS',
     role: 'PSDM Staff',
-    period: 'Mar 2022 — Mar 2023',
+    period: 'Mar 2022 - Mar 2023',
     description: 'Helped new students adapt to campus life and participate in organization activities.',
   },
   {
     name: 'PKKMB FATISDA 2022',
     role: 'Head Division of Curriculum',
-    period: 'July 2022 — Aug 2022',
-    description: 'Managed Curriculum Division — evaluated tasks, organized orientation program for new students.',
+    period: 'July 2022 - Aug 2022',
+    description: 'Managed Curriculum Division: evaluated tasks and organized the orientation program for new students.',
   },
   {
     name: 'OSPRODI INFORMATIKA',
     role: 'Head Division of Technology',
-    period: 'July 2022 — Aug 2022',
+    period: 'July 2022 - Aug 2022',
     description: 'Managed ALGORITMARU TASK (web-based) and CODING TASK challenges for new students.',
   },
   {
     name: 'Bangkit Academy Batch 2',
-    role: 'Cohort — Machine Learning Path',
-    period: 'Aug 2023 — Jan 2024',
-    description: 'Studied Machine Learning with Python/JS, TensorFlow, TFD Certification. Capstone: "NutriChive" — ingredient scanning & recipe recommendation app.',
+    role: 'Cohort, Machine Learning Path',
+    period: 'Aug 2023 - Jan 2024',
+    description: 'Studied Machine Learning with Python/JS, TensorFlow, and TFD Certification. Capstone: "NutriChive", an ingredient scanning and recipe recommendation app.',
   },
 ]
 
-// ============================================
-// SKILLS
-// ============================================
 export const skills: SkillCategory[] = [
   {
     name: 'Frontend',
@@ -301,18 +275,12 @@ export const skills: SkillCategory[] = [
 
 export const technicalSkills = skills
 
-// ============================================
-// LANGUAGES
-// ============================================
 export const languages: Language[] = [
   { name: 'Bahasa Indonesia', level: 'Native', percentage: 100 },
   { name: 'English', level: 'Proficient', percentage: 85 },
   { name: 'Japanese', level: 'Beginner', percentage: 25 },
 ]
 
-// ============================================
-// NAVIGATION LINKS
-// ============================================
 export const navLinks = [
   { label: 'Home', href: '#hero' },
   { label: 'About', href: '#about' },

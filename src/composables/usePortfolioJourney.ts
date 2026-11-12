@@ -39,7 +39,7 @@ export function usePortfolioJourney() {
     window.addEventListener('resize', measure, { passive: true })
     document.fonts?.ready.then(() => { if (mounted) measure() })
 
-    unsubscribeSmoothScroll = onSmoothScroll(({ scroll }) => {
+    unsubscribeSmoothScroll = onSmoothScroll((scroll) => {
       updateFromScroll(scroll)
     })
 

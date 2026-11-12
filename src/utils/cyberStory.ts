@@ -12,17 +12,22 @@ export const FLIGHT_START = 0.44
 export const FLIGHT_END = 1
 export const CHAPTER_SCROLL_VH = 280
 export const LAST_POSITION = CYBER_STOPS.length - 1 + 0.38
-export const MAX_JOURNEY_SPEED = 0.32
-export const MAX_JOURNEY_ACCELERATION = 0.65
+// Chapters per second. Responsive enough to feel attached to the wheel,
+// bounded so a flick never teleports the camera.
+export const MAX_JOURNEY_SPEED = 0.46
+export const MAX_JOURNEY_ACCELERATION = 0.95
+/** Upper bound for deliberate multi-chapter jumps from the navigation. */
+export const MAX_JOURNEY_BOOST = 1.15
 /** One bounded timeline for camera, signal, models and copy. Never teleport on input spikes. */
-export function advanceJourney(position: number, velocity: number, target: number, seconds: number) {
+export function advanceJourney(position: number, velocity: number, target: number, seconds: number, maxSpeed: number = MAX_JOURNEY_SPEED) {
+  const speed = Math.max(MAX_JOURNEY_SPEED, Math.min(MAX_JOURNEY_BOOST, maxSpeed))
   const dt = Math.max(0, Math.min(1 / 30, seconds))
   if (!dt) return { position, velocity }
   const error = target - position
   // Finish imperceptible settling exactly, so an arrived chapter can unlock its panel.
   if (Math.abs(error) < 0.00001 && Math.abs(velocity) < 0.001) return { position: target, velocity: 0 }
-  const desired = Math.max(-MAX_JOURNEY_SPEED, Math.min(MAX_JOURNEY_SPEED, error * 4))
-  const change = MAX_JOURNEY_ACCELERATION * dt
+  const desired = Math.max(-speed, Math.min(speed, error * 4))
+  const change = MAX_JOURNEY_ACCELERATION * (speed / MAX_JOURNEY_SPEED) * dt
   const nextVelocity = velocity + Math.max(-change, Math.min(change, desired - velocity))
   const movement = nextVelocity * dt
   if (Math.abs(movement) >= Math.abs(error) && movement * error >= 0) return { position: target, velocity: 0 }

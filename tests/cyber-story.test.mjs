@@ -5,7 +5,7 @@ import ts from 'typescript'
 
 const source = readFileSync(new URL('../src/utils/cyberStory.ts', import.meta.url), 'utf8')
 const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext } })
-const { CYBER_STOPS, flightAt, storyCopyAt, LAST_POSITION, CHAPTER_SCROLL_VH, centerFollowAt, engineeringAssemblyAt, advanceJourney, MAX_JOURNEY_SPEED, cameraDepthAt, signalPointAt, detailScrollableAt } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`)
+const { CYBER_STOPS, flightAt, storyCopyAt, LAST_POSITION, CHAPTER_SCROLL_VH, centerFollowAt, engineeringAssemblyAt, advanceJourney, MAX_JOURNEY_SPEED, MAX_JOURNEY_BOOST, cameraDepthAt, signalPointAt, detailScrollableAt } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`)
 
 test('every chapter has a readable dwell and travels deeper into the same world', () => {
   CYBER_STOPS.forEach((stop, i) => {
@@ -145,4 +145,27 @@ test('detail scroll is available only after full chapter arrival', () => {
     assert.equal(detailScrollableAt(chapter + 1), true)
   }
   assert.equal(detailScrollableAt(LAST_POSITION), true)
+})
+
+
+test('navigation boost flies faster but stays bounded and never teleports', () => {
+  let state = { position: 0, velocity: 0 }
+  let frames = 0
+  while (Math.abs(state.position - 6) > 0.001 && frames < 60 * 30) {
+    const previous = state.position
+    state = advanceJourney(state.position, state.velocity, 6, 1 / 60, MAX_JOURNEY_BOOST)
+    assert.ok(state.position - previous <= MAX_JOURNEY_BOOST / 60 + 1e-10)
+    frames++
+  }
+  assert.ok(frames / 60 < 9, `Boosted jump too slow: ${frames / 60}s`)
+  // An out-of-range request is clamped to the boost ceiling.
+  let capped = { position: 0, velocity: 0 }
+  for (let f = 0; f < 600; f++) {
+    const previous = capped.position
+    capped = advanceJourney(capped.position, capped.velocity, 6, 1 / 60, 50)
+    assert.ok(capped.position - previous <= MAX_JOURNEY_BOOST / 60 + 1e-10)
+  }
+  // Without a boost the default bound is unchanged.
+  const normal = advanceJourney(0, MAX_JOURNEY_SPEED, 6, 1 / 60)
+  assert.ok(normal.position <= MAX_JOURNEY_SPEED / 60 + 1e-10)
 })

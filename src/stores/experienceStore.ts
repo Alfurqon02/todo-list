@@ -5,78 +5,64 @@ import { usePreferredReducedMotion, useStorage } from '@vueuse/core'
 export type ExperienceMode = 'immersive' | 'clean'
 
 export const useExperienceStore = defineStore('experience', () => {
-  // Retain the storage key to migrate visitors who previously selected light.
   const theme = useStorage<'dark' | 'light'>('portfolio-theme', 'dark')
-  theme.value = 'dark'
-  const isDark = computed(() => true)
-  function toggleDark() { theme.value = 'dark' }
+  const isDark = computed(() => theme.value === 'dark')
+
+  function toggleDark() {
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.add('theme-switching')
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          document.documentElement.classList.remove('theme-switching')
+        })
+      })
+    }
+    theme.value = theme.value === 'dark' ? 'light' : 'dark'
+  }
+
   watchEffect(() => {
-    if (typeof document !== 'undefined') document.documentElement.classList.add('dark')
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.toggle('dark', theme.value === 'dark')
+      const meta = document.querySelector('meta[name="theme-color"]')
+      if (meta) {
+        meta.setAttribute('content', theme.value === 'dark' ? '#0c0f0d' : '#f2efe9')
+      }
+    }
   })
 
-  // ==========================================
-  // EXPERIENCE MODE (Cyber-Carousel vs Terminal Log)
-  // ==========================================
-  // If URL has #clean (or #terminal), automatically show clean mode; otherwise default to normal (immersive).
   function getModeFromHash(): ExperienceMode | null {
     if (typeof window === 'undefined') return null
     const hash = window.location.hash.toLowerCase()
-    if (hash === '#clean' || hash === '#terminal') {
-      return 'clean'
-    }
+    if (hash === '#clean' || hash === '#terminal' || hash === '#home') return 'clean'
+    if (hash === '#3d' || hash === '#immersive') return 'immersive'
     return null
   }
 
   const initialHashMode = getModeFromHash()
-  const storedMode = useStorage<ExperienceMode>('portfolio-mode', 'immersive')
-  // Use hash if present, otherwise storedMode (or default 'immersive')
+  const storedMode = useStorage<ExperienceMode>('portfolio-view', 'clean')
   const mode = ref<ExperienceMode>(initialHashMode ?? storedMode.value)
 
-  // Listen to hash changes in browser
   if (typeof window !== 'undefined') {
     window.addEventListener('hashchange', () => {
       const hashMode = getModeFromHash()
-      if (hashMode) {
-        mode.value = hashMode
-      } else if (window.location.hash === '' || window.location.hash === '#immersive' || window.location.hash === '#3d') {
-        mode.value = 'immersive'
-      }
+      if (hashMode) mode.value = hashMode
     })
   }
 
-  // ==========================================
-  // 3D FLIGHT TOGGLE (navbar switch)
-  //
-  // Turning this off unmounts the WebGL corridor and collapses the scroll
-  // choreography to plain static content, without swapping the whole layout
-  // the way the Terminal Log mode does.
-  // ==========================================
   const animationsEnabled = useStorage<boolean>('portfolio-animations', true)
-
-  // Rule 1.2: reduced motion -> land on the immersive layout with the flight off
   const reducedMotion = usePreferredReducedMotion()
   if (reducedMotion.value === 'reduce') {
     animationsEnabled.value = false
   }
 
-  // Audio SFX state
   const soundEnabled = useStorage<boolean>('portfolio-sound', false)
-
-  // Active Orbit Node
   const activeNodeIndex = ref(0)
-
-  // Total nodes in carousel
   const totalNodes = ref(11)
-
-  // Global carousel rotation angle
   const carouselRotation = ref(0)
-
-  // Continuous 3D Chained Journey progress (0.0 to 5.0)
   const journeyProgress = ref(0)
   const activeSkillIndex = ref(0)
   const activeResearchIndex = ref(0)
 
-  // Sync mode changes to storage
   watch(mode, (newMode) => {
     storedMode.value = newMode
   })
@@ -100,9 +86,6 @@ export const useExperienceStore = defineStore('experience', () => {
     animationsEnabled.value = !animationsEnabled.value
   }
 
-  // ==========================================
-  // FPS MONITORING (Rule 2.2)
-  // ==========================================
   const showFpsWarning = ref(false)
   let fpsFrames = 0
   let fpsLastTime = performance.now()
@@ -150,9 +133,6 @@ export const useExperienceStore = defineStore('experience', () => {
     showFpsWarning.value = false
   }
 
-  // ==========================================
-  // SCROLL PROGRESS (for 3D reactions)
-  // ==========================================
   const scrollProgress = ref(0)
 
   function updateScrollProgress() {

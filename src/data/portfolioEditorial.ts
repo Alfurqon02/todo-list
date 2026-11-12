@@ -1,11 +1,11 @@
 export const selectedResearch = {
   title: 'Dual-View Radiographic Captioning',
-  subtitle: 'Chest X-ray frontal and lateral views using DenseNet–LSTM',
+  subtitle: 'Chest X-ray frontal and lateral views using DenseNet-LSTM',
   type: 'Undergraduate thesis',
-  period: '2024 — 2026',
+  period: '2024 - 2026',
   institution: 'Universitas Sebelas Maret',
-  description: 'Exploring how two views of a chest X-ray can inform a generated radiology caption. DenseNet extracts visual features; an LSTM turns those features into a language sequence.',
-  tags: ['Computer vision', 'Deep learning', 'DenseNet–LSTM'],
+  description: 'The model takes the frontal and lateral X-ray from the same patient, extracts features from both with DenseNet, and generates a caption with an LSTM.',
+  tags: ['Computer vision', 'Deep learning', 'DenseNet-LSTM'],
 }
 
 export const chapters = [
